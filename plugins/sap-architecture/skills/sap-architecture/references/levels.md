@@ -60,7 +60,7 @@ L3 is **not documented**. If a user explicitly asks for L3 (typical signals: hos
 
 ## Canvas & tab naming
 
-- All levels use `pageWidth="1169" pageHeight="827"` — A4 landscape in pixels at 96 DPI. This matches every published SAP example.
+- Use `pageWidth="1169" pageHeight="827"` for new diagrams unless the selected SAP reference template uses a different size. The 2026 corpus includes larger landscape and portrait variants; preserving the chosen template's canvas scores better than normalising every diagram to one size.
 - `grid="1" gridSize="10"` — show the grid while authoring, snap everything to 10 px.
 - `<diagram name="…">` tab stem matches the output filename, suffixed with the level: `Product_Name_L2`, `ARC1_BTP_Deployment_L2`.
 - `page="1"`, `pageScale="1"`, `math="0"`, `shadow="0"`, `background="none"` (default white).

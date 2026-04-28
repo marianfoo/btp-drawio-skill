@@ -7,7 +7,7 @@ reference. Two diagrams that draw the same scenario end up with very similar
 fingerprints across these dimensions:
 
   Structural
-    * canvas size (W × H) — should always be 1169 × 827
+    * canvas size (W × H) — should match the selected SAP template
     * total cell count, vertex count, edge count
     * zone count (cells with arcSize=16, strokeWidth=1.5, fontStyle=1, top-left
       label)

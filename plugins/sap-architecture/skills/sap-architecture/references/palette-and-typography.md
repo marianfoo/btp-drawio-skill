@@ -71,6 +71,20 @@ The semantic mapping for connectors is fixed (see `shapes-and-edges.md`):
 
 — `lines_connectors.md`
 
+## Observed Architecture Center variants
+
+The 2026 corpus profile in `corpus-findings.md` found these additional SAP-authored variants in real `.drawio` files. Treat them as accepted inherited values, not as colors to introduce casually:
+
+| Family | Observed variants |
+|---|---|
+| SAP blue | `#00185A`, `#002A86`, `#0057D2`, `#2395FF` |
+| SAP light blue fills | `#D1EFFF`, `#CCDDFF`, `#EAF8FF`, `#EDF8FF`, `#ECF8FF` |
+| Neutral greys | `#475E74`, `#475F75`, `#5B738B`, `#D5DADD`, `#EDEDED`, `#EDEFF0` |
+| Positive green | `#266F3A` |
+| Indigo | `#470BED`, `#7F00FF` |
+
+Generated diagrams should still prefer the guideline palette above. The validator accepts these variants because SAP's own Architecture Center files use them.
+
 ## Color proportion — the area-color rule
 
 > "It is not recommended to use the colors too heavily, they can overpower the diagram."
@@ -112,7 +126,7 @@ The guideline document mentions Arial and Arial Black as font choices:
 
 — `solution_diagr_intro/intro.md`
 
-**However**, every published SAP `.drawio` file under `assets/editable-diagram-examples/` and every reference architecture under `SAP/architecture-center/docs/ref-arch/` ships with **`fontFamily=Helvetica`** — that's the actual de-facto value. The skill follows the shipped files: emit Helvetica, autofix to Helvetica. The "Arial" advice in `intro.md` is about adding it as an *available* custom font in your draw.io install, not about changing the diagrams themselves.
+The current public corpus mixes `Helvetica`, `Arial`, and a small amount of `72 Brand`. The skill emits **Helvetica** and `autofix.py` normalises generated content to Helvetica because it is the dominant value in both the canonical BTP examples and Architecture Center diagrams. If a copied SAP template already contains `Arial` or `72 Brand` in rich-text labels, preserve it unless you are rewriting that label.
 
 ### Hierarchy
 

@@ -12,7 +12,7 @@ The files under this directory are **not** covered by the MIT license that appli
 
 ## Bundled reference templates
 
-All 27 templates under `reference-examples/` are sourced verbatim from SAP and are licensed under Apache-2.0.
+All 63 templates under `reference-examples/` are sourced verbatim from SAP and are licensed under Apache-2.0.
 
 ### From `SAP/btp-solution-diagrams` (prefix `btp_`)
 
@@ -34,26 +34,62 @@ The 11 canonical examples shipped at https://github.com/SAP/btp-solution-diagram
 
 ### From `SAP/architecture-center` (prefix `ac_`)
 
-A curated 16-template subset of the 111 reference architectures at https://github.com/SAP/architecture-center/tree/main/docs/ref-arch chosen for breadth across the BTP scenarios this skill is most often asked to produce.
+A curated 52-template subset of the 127 reference architecture draw.io files at https://github.com/SAP/architecture-center/tree/main/docs/ref-arch chosen for breadth across the BTP scenarios this skill is most often asked to produce.
 
 | Local file | Upstream RA folder |
 |---|---|
+| `ac_RA0001_EventDriven_RefArch.drawio` | RA0001 — Event-driven architecture (root reference architecture) |
+| `ac_RA0001_EventDriven_HybridEnterprise.drawio` | RA0001 / 1-event-driven-arch — hybrid enterprise |
+| `ac_RA0001_EventDriven_SAPEnterprise.drawio` | RA0001 / 1-event-driven-arch — SAP enterprise |
+| `ac_RA0001_E2B_CloudConnector.drawio` | RA0001 / 4-e2b-framework — Cloud Connector |
+| `ac_RA0001_E2B_PrivateLink.drawio` | RA0001 / 4-e2b-framework — Private Link |
+| `ac_RA0002_MultiRegionResiliency.drawio` | RA0002 — Multi-region resiliency for SAP BTP use cases |
+| `ac_RA0002_MultiAZ.drawio` | RA0002 / 1-single-region-resiliency — Multi-AZ |
+| `ac_RA0002_LoadBalancer.drawio` | RA0002 / 3-loadbalancers |
+| `ac_RA0003_FederatedML.drawio` | RA0003 — Federated machine learning |
+| `ac_RA0004_HyperscalerData.drawio` | RA0004 — Explore hyperscaler data |
+| `ac_RA0004_AWSDataIntegration.drawio` | RA0004 / 1-aws-data-integration |
+| `ac_RA0004_AzureDataIntegration.drawio` | RA0004 / 2-azure-data-integration |
+| `ac_RA0004_DatabricksDataIntegration.drawio` | RA0004 / 3-databricks-data-integration |
+| `ac_RA0005_GenAI.drawio` | RA0005 — Generative AI root reference architecture |
+| `ac_RA0005_GenAI_SemanticSearch.drawio` | RA0005 / 2-semantic-search |
+| `ac_RA0005_GenAI_RAG.drawio` | RA0005 / 3-retrieval-augmented-generation |
+| `ac_RA0005_Agent2Agent.drawio` | RA0005 / 8-agent2agent-interoperability |
 | `ac_RA0006_PrivateLinkService.drawio` | RA0006 — Secure connectivity with SAP Private Link Service |
 | `ac_RA0007_SuSaaS_CAP_Multitenant.drawio` | RA0007 — Multitenant SaaS with CAP (5-mt-architecture) |
+| `ac_RA0008_EdgeIntegrationCell.drawio` | RA0008 — SAP Edge Integration Cell |
 | `ac_RA0009_TaskCenter_CentralInbox.drawio` | RA0009 — Establish a central inbox with SAP Task Center |
 | `ac_RA0010_BuildWorkZone.drawio` | RA0010 — SAP Build Work Zone |
+| `ac_RA0013_BusinessDataCloud.drawio` | RA0013 — SAP Business Data Cloud |
+| `ac_RA0013_BDC_Databricks.drawio` | RA0013 / 5-sap-databricks-in-business-data-cloud |
+| `ac_RA0013_BDC_AICore.drawio` | RA0013 / 7-bdc-powered-by-ai-core |
+| `ac_RA0013_BDC_CloudIdentity.drawio` | RA0013 / 6-cloud-identity-services-bdc |
 | `ac_RA0014_OData_AppRouter_PrivateLink.drawio` | RA0014 — Multi-region: OData via App Router with Private Link |
 | `ac_RA0014_OData_CAP_PrivateLink.drawio` | RA0014 — Multi-region: OData via CAP with Private Link |
+| `ac_RA0018_BuildProcessAutomation.drawio` | RA0018 — Integrate and extend with SAP Build Process Automation |
 | `ac_RA0019_IAM_overview.drawio` | RA0019 — IAM with Cloud Identity Services (overview) |
 | `ac_RA0019_Authentication.drawio` | RA0019 / 1-authentication-and-single-sign-on |
 | `ac_RA0019_IdentityLifecycle.drawio` | RA0019 / 2-identity-lifecycle |
 | `ac_RA0019_Authorization.drawio` | RA0019 / 3-authorization-design |
+| `ac_RA0020_B2BIntegration.drawio` | RA0020 — Business-to-business integration |
+| `ac_RA0021_A2AIntegration.drawio` | RA0021 — Application-to-application integration |
+| `ac_RA0022_APIManagedIntegration.drawio` | RA0022 — API-managed integration |
 | `ac_RA0023_DevOps.drawio` | RA0023 — DevOps with SAP BTP |
 | `ac_RA0024_Joule_IAM_authn.drawio` | RA0024 / 2-joule-iam (authentication) |
 | `ac_RA0024_Joule_IAM_CDM.drawio` | RA0024 / 2-joule-iam (Common Data Model) |
+| `ac_RA0024_UnifiedJoule.drawio` | RA0024 — Unified Joule root architecture |
+| `ac_RA0024_Joule_S4PublicCloud.drawio` | RA0024 / 1-joule-for-sap-s4-hana — public cloud |
+| `ac_RA0024_Joule_Studio.drawio` | RA0024 / 3-extend-joule-with-joule-studio |
+| `ac_RA0025_PIPO_EIC_Pre.drawio` | RA0025 / 1-sap-pi-po-to-integration-suite — pre-migration |
+| `ac_RA0025_PIPO_EIC_Post.drawio` | RA0025 / 1-sap-pi-po-to-integration-suite — post-migration |
+| `ac_RA0027_SIEM_SOAR_ETD.drawio` | RA0027 — SIEM/SOAR with Enterprise Threat Detection |
+| `ac_RA0028_SuccessFactorsModuleIntegration.drawio` | RA0028 — SuccessFactors module integration |
 | `ac_RA0029_AgenticAI_root.drawio` | RA0029 — Agentic AI / AI Agents (root) |
 | `ac_RA0029_A2A_MCP.drawio` | RA0029 / 1-a2a-and-mcp |
 | `ac_RA0029_GenAI_ProCode.drawio` | RA0029 / 3-pro-code-ai-agents |
+| `ac_RA0029_IntegrateAIAgentsWithJoule.drawio` | RA0029 / 4-integrate-ai-agents-with-joule |
+| `ac_RA0029_JouleAgentsToolsEcosystem.drawio` | RA0029 / 5-integrate-joule-agents-and-tools-into-your-ecosystem |
+| `ac_RA0029_EmbodiedAIAgents.drawio` | RA0029 / 6-embodied-ai-agents |
 
 ## Apache License 2.0 — short summary
 

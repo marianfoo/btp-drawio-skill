@@ -8,7 +8,7 @@ A claim like "this plugin produces SAP-Architecture-Center-style diagrams" is on
 
 | Dimension | What's checked |
 |-----------|----------------|
-| **Canvas** | `pageWidth × pageHeight` — should always be `1169 × 827` |
+| **Canvas** | `pageWidth × pageHeight` — should match the selected SAP template; `1169 × 827` is the default for new L2 diagrams |
 | **Counts** | total cells, vertices, edges, icons (cells with SAP-icon SVG data URI), pills (cells with `arcSize=50`) |
 | **Palette** | the set of hex colors in the file (Jaccard similarity) |
 | **Fonts** | `fontFamily` values used (subset = full credit) |
@@ -43,7 +43,7 @@ description ┐
             ▼
 ┌──────────────────────────────────────────────────────────┐
 │ Step 1 — pick the closest reference template             │
-│   Selection guide in SKILL.md (27 templates available)   │
+│   select_reference.py ranks 63 bundled SAP templates     │
 └──────────────────────────────────────────────────────────┘
             │
             ▼
@@ -69,9 +69,9 @@ description ┐
             │
             ▼
 ┌──────────────────────────────────────────────────────────┐
-│ Step 5 — compare.py vs the reference                     │
-│   Score should be ≥ 90 if you started from a template    │
-│   If < 90, autofix may have over-corrected               │
+│ Step 5 — score_corpus.py across all bundled references   │
+│   Best score should be ≥ 90 if template drift is low     │
+│   If < 90, compare.py shows where the structure drifted  │
 └──────────────────────────────────────────────────────────┘
             │
             ▼
@@ -90,8 +90,9 @@ The bundled `examples/iam-arc1-mcp-l2.drawio` was produced by:
    - zone label: `SAP BTP Applications -IAM based on SAP Cloud Identity Services` → `SAP BTP Applications - ARC-1 MCP based on SAP Cloud Identity Services`
    - card label: `Mobile/Desktop` → `Claude Desktop / Copilot Studio`
 3. Running `autofix.py --write` (resulted in 436 mechanical fixes — geometry snap, hex case, arc size, font normalisation, comment strip).
-4. Running `validate.py` — clean.
+4. Running `validate.py` — exit 0.
 5. Running `compare.py` against the original reference — **scored 100/100**.
+6. Running `score_corpus.py --min-score 90` across the 63 bundled templates — best score **100/100**.
 
 This proves the workflow: with a few hand-edits, you get a fingerprint indistinguishable from SAP's canonical example.
 
@@ -118,11 +119,39 @@ Also, the validator can't check:
 
 For those, manual review against `references/do-and-dont.md` remains necessary.
 
+## Corpus scoring
+
+`score_corpus.py` wraps `compare.py` and ranks the candidate against every bundled `.drawio` reference:
+
+```bash
+python3 scripts/score_corpus.py --top 5 --min-score 90 my-diagram.drawio
+```
+
+Use this as the final fidelity gate. A good template-derived diagram should have:
+
+| Signal | Target |
+|---|---|
+| Best corpus score | `>= 90` |
+| Chosen-template pairwise score | `>= 90`, ideally `95-100` |
+| Validator errors | `0` |
+| Off-palette / line-style drift | explainable or fixed |
+
+For research runs against SAP's full public corpus, clone the upstream repositories and pass them as reference directories:
+
+```bash
+python3 scripts/score_corpus.py \
+  --references /path/to/SAP/btp-solution-diagrams \
+  --references /path/to/SAP/architecture-center \
+  my-diagram.drawio
+```
+
+See `corpus-findings.md` for the 2026 snapshot that motivated the 63-template bundle.
+
 ## How to add new reference templates
 
 1. Drop a `.drawio` file in `assets/reference-examples/` (any name)
 2. Confirm it's Apache-2.0 / MIT / your own work
 3. Add an entry to `assets/NOTICE.md` if the source is third-party
-4. Re-score your test diagrams against the new template — `compare.py --score`
+4. Re-score your test diagrams against the new template — `score_corpus.py --top 10`
 
 The skill picks the highest-scoring reference automatically when the user describes a scenario, so adding more references improves quality monotonically.

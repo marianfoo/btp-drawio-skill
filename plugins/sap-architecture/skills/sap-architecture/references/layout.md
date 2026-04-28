@@ -1,6 +1,6 @@
 # Canvas layout recipe
 
-Every SAP Architecture Center reference L2 diagram sits on a **1169 × 827** canvas with the same coarse skeleton. Start from it, don't reinvent.
+The canonical SAP BTP examples use a **1169 × 827** landscape canvas, and this remains the safest default for new L2 diagrams. Architecture Center also contains larger landscape and portrait variants; when you start from one of those templates, preserve its canvas size instead of forcing it back to 1169 × 827.
 
 ## Coordinate grid
 

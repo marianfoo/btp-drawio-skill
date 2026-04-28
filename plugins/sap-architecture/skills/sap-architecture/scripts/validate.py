@@ -5,6 +5,7 @@ Catches the bugs that make a diagram look unprofessional:
 
   Structural
     * malformed XML / missing mxGeometry / duplicate ids / comments
+    * mxCell ids, including draw.io UserObject wrapper ids
   Alignment
     * x/y/width/height not integer multiples of 10 (grid-snap)
     * edge source+target don't share a center axis (bent arrows)
@@ -64,7 +65,7 @@ SAP_PALETTE = {
     # --- preset (in drawio-config-all-in-one.json) ----------------------------
     "#793802",                     # Brown — present in preset, no documented role
     # --- darker text / accent variants used in real SAP diagrams --------------
-    "#002A86", "#00185A",          # darker SAP blue (used for ABAP-system / hero accents)
+    "#002A86", "#00185A", "#0057D2", "#2395FF",  # SAP blue variants observed in Architecture Center
     "#266F3A",                     # darker positive green
     "#470BED",                     # darker indigo (preset variant of #5D36FF)
     "#7F00FF",                     # alt accent purple
@@ -74,7 +75,8 @@ SAP_PALETTE = {
     "#475E74", "#475F75",          # off-by-one variants of #475E75
     "#5B738B",                     # lighter grey
     "#595959",
-    "#D5DADD", "#EAECEE", "#EDEFF0", "#EAF8FF", "#EDF8FF", "#ECF8FF",
+    "#D5DADD", "#EAECEE", "#EDEDED", "#EDEFF0", "#EAF8FF", "#EDF8FF", "#ECF8FF",
+    "#D1EFFF", "#CCDDFF",
     "#FCFCFC",
     # --- basics ----------------------------------------------------------------
     "#FFFFFF", "#FFF", "#000000", "#000",
@@ -201,24 +203,48 @@ def validate(path: Path) -> Report:
         return report
 
     # ---- collect cells & basic structural checks ---------------------------
-    cells: dict[str, ET.Element] = {}
-    duplicate_ids: set[str] = set()
-    for cell in root.iter("mxCell"):
+    parent_by_elem = {id(child): parent for parent in root.iter() for child in list(parent)}
+
+    def effective_cell_id(cell: ET.Element) -> str | None:
         cid = cell.get("id")
-        if cid is None:
-            report.add("error", "xml", "mxCell without id attribute")
-            continue
-        if cid in cells:
-            duplicate_ids.add(cid)
-        cells[cid] = cell
+        if cid:
+            return cid
+        parent = parent_by_elem.get(id(cell))
+        if parent is not None and parent.tag == "UserObject":
+            return parent.get("id")
+        return None
 
-        is_vertex = cell.get("vertex") == "1"
-        is_edge = cell.get("edge") == "1"
-        if (is_vertex or is_edge) and cell.find("mxGeometry") is None:
-            report.add("error", "xml", "vertex/edge missing <mxGeometry>", cell=cid)
+    graphs = root.findall(".//mxGraphModel") or [root]
 
-    for cid in duplicate_ids:
-        report.add("error", "xml", f"duplicate id {cid!r}")
+    def scoped_id(graph_index: int, cell_id: str) -> str:
+        return cell_id if len(graphs) == 1 else f"{graph_index}:{cell_id}"
+
+    cells: dict[str, ET.Element] = {}
+    cell_scopes: dict[str, int] = {}
+    duplicate_ids: set[tuple[int, str]] = set()
+    for graph_index, graph in enumerate(graphs):
+        seen_in_graph: set[str] = set()
+        for cell in graph.iter("mxCell"):
+            cid = effective_cell_id(cell)
+            if cid is None:
+                report.add("error", "xml", "mxCell without id attribute")
+                continue
+            if cid in seen_in_graph:
+                duplicate_ids.add((graph_index, cid))
+            seen_in_graph.add(cid)
+
+            key = scoped_id(graph_index, cid)
+            cells[key] = cell
+            cell_scopes[key] = graph_index
+
+            is_vertex = cell.get("vertex") == "1"
+            is_edge = cell.get("edge") == "1"
+            if (is_vertex or is_edge) and cell.find("mxGeometry") is None:
+                report.add("error", "xml", "vertex/edge missing <mxGeometry>", cell=key)
+
+    for graph_index, cid in duplicate_ids:
+        suffix = "" if len(graphs) == 1 else f" in diagram page {graph_index + 1}"
+        report.add("error", "xml", f"duplicate id {cid!r}{suffix}")
 
     # ---- style / palette ---------------------------------------------------
     palette_text = DATA_URI_RE.sub("", text)
@@ -328,7 +354,7 @@ def validate(path: Path) -> Report:
     for cid, cell in cells.items():
         if cell.get("vertex") != "1":
             continue
-        parent = cell.get("parent") or ""
+        parent = scoped_id(cell_scopes[cid], cell.get("parent") or "")
         g = geom(cell)
         if not g or g[2] <= 0 or g[3] <= 0:
             continue
@@ -372,9 +398,10 @@ def validate(path: Path) -> Report:
         # Skip edges with explicit entry/exit anchors — author has chosen the docking
         if any(k in style for k in ("entryX", "exitX", "entryY", "exitY")):
             continue
-        src = cells.get(src_id)
-        tgt = cells.get(tgt_id)
-        if not src or not tgt:
+        scope = cell_scopes[cid]
+        src = cells.get(scoped_id(scope, src_id))
+        tgt = cells.get(scoped_id(scope, tgt_id))
+        if src is None or tgt is None:
             continue
         gs = geom(src)
         gt = geom(tgt)

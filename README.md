@@ -4,11 +4,11 @@ A Claude Code plugin (and Agent-Skill-compatible standalone skill) that authors 
 
 Bundles:
 - **99 SAP BTP service icons** (inline SVG data URIs, grey-background-circle variant — the one [SAP mandates](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/icons.md) for diagrams)
-- **27 pristine reference templates** (Apache-2.0): all 11 canonical examples from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams) (L0/L1/L2 across IAS, Build Work Zone, Process Automation, Task Center, Private Link, …) plus 16 curated reference architectures from [`SAP/architecture-center`](https://github.com/SAP/architecture-center) covering IAM, Joule, MCP / Agentic AI, multitenant SaaS, DevOps, Private Link, and Task Center
-- **6 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, and the comparison methodology — every value cited verbatim from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/)
+- **63 pristine reference templates** (Apache-2.0): all 11 canonical examples from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams) plus 52 curated reference architectures from [`SAP/architecture-center`](https://github.com/SAP/architecture-center), covering IAM, Joule, MCP / Agentic AI, multitenant SaaS, DevOps, Private Link, Event-Driven Architecture, resiliency, Business Data Cloud, integration, SIEM/SOAR, and SuccessFactors
+- **7 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, corpus findings, and the comparison methodology — every value cited from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/) or observed in SAP's public corpus
 - **A validator** (`validate.py`) that catches bent arrows, clipped labels, off-palette colors, off-grid coordinates, duplicate ids, missing `labelBackgroundColor`, and XML comments
 - **An autofixer** (`autofix.py`) that mechanically repairs grid snap, hex case, missing `absoluteArcSize=1`, wrong `strokeWidth`, non-Helvetica fonts, and stray XML comments
-- **A comparison harness** (`compare.py`) that fingerprints a `.drawio` against any SAP reference and reports a 0-100 fidelity score — the empirical justification for the "always start from a template" workflow
+- **A template selector + comparison harness** (`select_reference.py`, `compare.py`, `score_corpus.py`) that picks the nearest SAP template, fingerprints a `.drawio`, and reports a 0-100 fidelity score — the empirical justification for the "always start from a template" workflow
 
 > **Why a dedicated skill?** Reproducing SAP Architecture Center style by hand or via a generic drawio skill consistently produces off-style output — wrong palette, bent `orthogonalEdgeStyle` arrows, clipped labels, text bleeding into `#EBF8FF` BTP fills, blank icon stencils (`shape=mxgraph.sap.icon;SAPIcon=…` doesn't render in many installs). This plugin bakes in the rules that matter and gates every output behind a validator.
 
@@ -40,7 +40,7 @@ Then describe the diagram:
 
 > Create an SAP architecture diagram showing a Copilot Studio MCP client calling an ARC-1 BTP Cloud Foundry app. ARC-1 authenticates via XSUAA OAuth, uses Destination Service + Cloud Connector with Principal Propagation to reach an on-prem S/4HANA system.
 
-Claude will auto-load the skill (its trigger phrases are tuned for SAP / BTP / architecture / drawio keywords), pick the closest reference template, drop the right icons, compose the XML, run `autofix.py` + `validate.py`, and hand you back a ready-to-open `.drawio` file plus a numbered flow narration.
+Claude will auto-load the skill (its trigger phrases are tuned for SAP / BTP / architecture / drawio keywords), run `select_reference.py`, pick the closest reference template, drop the right icons, compose the XML, run `autofix.py` + `validate.py` + `score_corpus.py`, and hand you back a ready-to-open `.drawio` file plus a numbered flow narration.
 
 ### Example prompts
 
@@ -106,13 +106,13 @@ The skill is a plain [Agent Skills](https://agentskills.io)-compliant bundle —
 You have access to the SAP Architecture Skill. When the user asks for an SAP /
 BTP / on-prem architecture diagram, follow the 6-step workflow in SKILL.md:
 
-1. Parse description → plan (L0/L1/L2/L3, zones, services, flow, accent)
-2. Pick the closest reference template from assets/reference-examples/
+1. Parse description → plan (L0/L1/L2, zones, services, flow, accent)
+2. Pick the closest reference template with scripts/select_reference.py
 3. Place BTP service icons via scripts/extract_icon.py
 4. Compose the XML following references/layout.md, palette-and-typography.md,
    shapes-and-edges.md
-5. MANDATORY: run scripts/autofix.py --write <file> then scripts/validate.py
-   <file> — only return the diagram after validator exits clean
+5. MANDATORY: run scripts/autofix.py --write <file>, scripts/validate.py
+   <file>, and scripts/score_corpus.py --min-score 90 <file>
 6. Print the flow narration as a numbered markdown list
 
 The canonical rules come from https://github.com/SAP/btp-solution-diagrams —
@@ -144,6 +144,15 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_icon.py
 
 Fuzzy matching is built in — `"XSUAA"`, `"CPI"`, `"HANA"`, `"Cloud Connector"`, `"Audit Log"`, `"Authorization and Trust"` all resolve correctly.
 
+### Pick the closest SAP template from a prompt
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/select_reference.py --top 5 \
+  "Joule agent calls S/4HANA through MCP and XSUAA"
+```
+
+The selector ranks the 63 bundled templates by scenario family, level, filename matches, and visible labels in the draw.io file. Use it before editing XML.
+
 ### Score a diagram against a SAP reference
 
 ```bash
@@ -157,6 +166,15 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/compare.py --sc
 ```
 
 Calibration: a hand-crafted candidate built from scratch typically scores 50-55. A candidate built by copying a SAP reference template + relabeling for your scenario scores 95-100. See [`references/methodology.md`](plugins/sap-architecture/skills/sap-architecture/references/methodology.md) for the full breakdown.
+
+### Score a diagram against the whole bundled corpus
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/score_corpus.py \
+  --top 5 --min-score 90 my-diagram.drawio
+```
+
+`score_corpus.py` compares the candidate against all bundled SAP references and exits nonzero if the best score is below the threshold. For deeper research loops, pass cloned SAP repos with `--references /path/to/SAP/architecture-center --references /path/to/SAP/btp-solution-diagrams`.
 
 ### Validate an existing `.drawio`
 
@@ -209,11 +227,11 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/build_icon_inde
 
 When triggered, the skill runs a 6-step pipeline (documented in full in [`plugins/sap-architecture/skills/sap-architecture/SKILL.md`](plugins/sap-architecture/skills/sap-architecture/SKILL.md)):
 
-1. **Parse → plan** — infer level (L0/L1/L2/L3, default L2), zones, services, numbered flow steps, and which service is the "star" (accent color).
-2. **Pick reference template** — copy the closest pristine `.drawio` from `assets/reference-examples/` (three available: Cloud Identity Services L2 for trust/OAuth flows, Private Link Service L2 for on-prem connectivity, Task Center L2 for multi-backend aggregation). *Never draw from scratch.*
+1. **Parse → plan** — infer level (L0/L1/L2, default L2), zones, services, numbered flow steps, and which service is the "star" (accent color).
+2. **Pick reference template** — run `select_reference.py`, then copy the closest pristine `.drawio` from the 63 bundled templates in `assets/reference-examples/`. *Never draw from scratch.*
 3. **Place BTP service icons** — fuzzy-lookup each service via `extract_icon.py`, which emits an `<mxCell>` with the official inline-SVG data URI and grid-snapped geometry.
 4. **Compose the XML** — fill in the zones, cards, edges, and pills following `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`.
-5. **Validate & autofix — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (gates the output). The skill doesn't hand you a diagram until validation passes.
+5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py`, then `score_corpus.py --min-score 90`. The skill doesn't hand you a diagram until validation passes and the corpus score is close to SAP's templates.
 6. **Narrate the flow** — print a numbered list explaining what each pill means, for pasting below the embedded image in Markdown / Confluence.
 
 ---
@@ -243,10 +261,10 @@ Every rule is citable back to the SAP upstream. The skill never improvises palet
 
 Conventions this skill adds on top of the SAP upstream (none of which are prescribed by SAP, but all are accepted defaults across the community — [lemaiwo/btp-drawio-skill](https://github.com/lemaiwo/btp-drawio-skill), [miyasuta/claude-drawio-btp-diagram](https://github.com/miyasuta/claude-drawio-btp-diagram)):
 
-- **Canvas**: 1169 × 827 px (A4 landscape)
+- **Canvas**: preserve the selected SAP template size; default new L2 diagrams to 1169 × 827 px (A4 landscape)
 - **Grid**: 10 px, everything snapped
 - **Font**: Helvetica (draw.io-portable; SAP products use "72")
-- **L0 / L1 / L2 / L3** — level taxonomy derived from filenames in [`SAP/architecture-center`](https://github.com/SAP/architecture-center). Default is **L2** (technical stakeholders, services + auth flows + legend). See [`references/levels.md`](plugins/sap-architecture/skills/sap-architecture/references/levels.md).
+- **L0 / L1 / L2** — the level taxonomy documented by SAP's BTP Solution Diagram Guidelines. Default is **L2** (technical stakeholders, services + auth flows + legend). See [`references/levels.md`](plugins/sap-architecture/skills/sap-architecture/references/levels.md).
 
 ### How the validator helps
 
@@ -283,10 +301,11 @@ btp-drawio-skill/
                 │   ├── shapes-and-edges.md ← style strings + line semantics
                 │   ├── layout.md          ← canvas + zone-by-zone placement
                 │   ├── do-and-dont.md     ← consolidated SAP rules (verbatim quotes)
+                │   ├── corpus-findings.md ← 2026 SAP corpus profile
                 │   └── methodology.md     ← comparison harness, fidelity claim
                 ├── assets/
                 │   ├── libraries/         ← 99-icon BTP library (Apache-2.0)
-                │   ├── reference-examples/ ← 27 pristine SAP templates (Apache-2.0)
+                │   ├── reference-examples/ ← 63 pristine SAP templates (Apache-2.0)
                 │   ├── icon-index.json    ← pre-computed slug→mxCell style lookup
                 │   └── NOTICE.md          ← per-file Apache-2.0 attribution
                 ├── examples/
@@ -296,7 +315,9 @@ btp-drawio-skill/
                     ├── extract_icon.py
                     ├── validate.py
                     ├── autofix.py
-                    └── compare.py         ← fingerprint + similarity score
+                    ├── select_reference.py
+                    ├── compare.py         ← pairwise fingerprint score
+                    └── score_corpus.py    ← best score across reference corpus
 ```
 
 ---
@@ -324,9 +345,10 @@ claude --plugin-dir ./plugins/sap-architecture
 # .github/workflows/validate-diagrams.yml
 - name: Validate SAP architecture diagrams
   run: |
-    pip install --quiet requests   # (none needed, stdlib only)
     for f in docs/**/*.drawio; do
-      python3 plugins/sap-architecture/skills/sap-architecture/scripts/validate.py --strict "$f"
+      python3 plugins/sap-architecture/skills/sap-architecture/scripts/autofix.py "$f"
+      python3 plugins/sap-architecture/skills/sap-architecture/scripts/validate.py "$f"
+      python3 plugins/sap-architecture/skills/sap-architecture/scripts/score_corpus.py --min-score 90 "$f"
     done
 ```
 
