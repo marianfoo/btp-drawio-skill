@@ -4,10 +4,11 @@ A Claude Code plugin (and Agent-Skill-compatible standalone skill) that authors 
 
 Bundles:
 - **99 SAP BTP service icons** (inline SVG data URIs, grey-background-circle variant — the one [SAP mandates](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/icons.md) for diagrams)
-- **3 pristine L2 reference templates** copied from [`SAP/architecture-center`](https://github.com/SAP/architecture-center)
-- **4 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, and canvas layout
-- **A validator** (`validate.py`) that catches bent arrows, clipped labels, off-palette colors, off-grid coordinates, duplicate ids, and missing `labelBackgroundColor`
-- **An autofixer** (`autofix.py`) that mechanically repairs grid snap, hex case, missing `absoluteArcSize=1`, wrong `strokeWidth`, and non-Helvetica fonts
+- **27 pristine reference templates** (Apache-2.0): all 11 canonical examples from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams) (L0/L1/L2 across IAS, Build Work Zone, Process Automation, Task Center, Private Link, …) plus 16 curated reference architectures from [`SAP/architecture-center`](https://github.com/SAP/architecture-center) covering IAM, Joule, MCP / Agentic AI, multitenant SaaS, DevOps, Private Link, and Task Center
+- **6 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, and the comparison methodology — every value cited verbatim from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/)
+- **A validator** (`validate.py`) that catches bent arrows, clipped labels, off-palette colors, off-grid coordinates, duplicate ids, missing `labelBackgroundColor`, and XML comments
+- **An autofixer** (`autofix.py`) that mechanically repairs grid snap, hex case, missing `absoluteArcSize=1`, wrong `strokeWidth`, non-Helvetica fonts, and stray XML comments
+- **A comparison harness** (`compare.py`) that fingerprints a `.drawio` against any SAP reference and reports a 0-100 fidelity score — the empirical justification for the "always start from a template" workflow
 
 > **Why a dedicated skill?** Reproducing SAP Architecture Center style by hand or via a generic drawio skill consistently produces off-style output — wrong palette, bent `orthogonalEdgeStyle` arrows, clipped labels, text bleeding into `#EBF8FF` BTP fills, blank icon stencils (`shape=mxgraph.sap.icon;SAPIcon=…` doesn't render in many installs). This plugin bakes in the rules that matter and gates every output behind a validator.
 
@@ -143,6 +144,20 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_icon.py
 
 Fuzzy matching is built in — `"XSUAA"`, `"CPI"`, `"HANA"`, `"Cloud Connector"`, `"Audit Log"`, `"Authorization and Trust"` all resolve correctly.
 
+### Score a diagram against a SAP reference
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/compare.py \
+  plugins/sap-architecture/skills/sap-architecture/assets/reference-examples/btp_SAP_Cloud_Identity_Services_Authentication_L2.drawio \
+  my-diagram.drawio
+
+# one-line score 0-100
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/compare.py --score \
+  reference.drawio my-diagram.drawio
+```
+
+Calibration: a hand-crafted candidate built from scratch typically scores 50-55. A candidate built by copying a SAP reference template + relabeling for your scenario scores 95-100. See [`references/methodology.md`](plugins/sap-architecture/skills/sap-architecture/references/methodology.md) for the full breakdown.
+
 ### Validate an existing `.drawio`
 
 ```bash
@@ -263,19 +278,25 @@ btp-drawio-skill/
             └── sap-architecture/
                 ├── SKILL.md               ← 6-step workflow (<500 lines)
                 ├── references/
-                │   ├── levels.md          ← L0/L1/L2/L3 decision guide
-                │   ├── palette-and-typography.md
-                │   ├── shapes-and-edges.md
-                │   └── layout.md
+                │   ├── levels.md          ← L0/L1/L2 decision guide
+                │   ├── palette-and-typography.md  ← Horizon hex + Helvetica + SAP rules
+                │   ├── shapes-and-edges.md ← style strings + line semantics
+                │   ├── layout.md          ← canvas + zone-by-zone placement
+                │   ├── do-and-dont.md     ← consolidated SAP rules (verbatim quotes)
+                │   └── methodology.md     ← comparison harness, fidelity claim
                 ├── assets/
                 │   ├── libraries/         ← 99-icon BTP library (Apache-2.0)
-                │   ├── reference-examples/ ← 3 pristine L2 templates
-                │   └── icon-index.json    ← pre-computed slug→mxCell style lookup
+                │   ├── reference-examples/ ← 27 pristine SAP templates (Apache-2.0)
+                │   ├── icon-index.json    ← pre-computed slug→mxCell style lookup
+                │   └── NOTICE.md          ← per-file Apache-2.0 attribution
+                ├── examples/
+                │   └── iam-arc1-mcp-l2.drawio  ← worked example (scored 100/100)
                 └── scripts/
                     ├── build_icon_index.py
                     ├── extract_icon.py
                     ├── validate.py
-                    └── autofix.py
+                    ├── autofix.py
+                    └── compare.py         ← fingerprint + similarity score
 ```
 
 ---

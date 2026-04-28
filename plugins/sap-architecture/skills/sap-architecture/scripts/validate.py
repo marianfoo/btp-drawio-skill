@@ -41,24 +41,43 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # ---------- SAP Horizon palette ----------------------------------------------
+# Source of truth, in priority order:
+#   1. SAP/btp-solution-diagrams/guideline/docs/btp_guideline/foundation.md
+#      and diagr_comp/areas.md (primary, semantic, accent)
+#   2. Hex values observed in SAP/btp-solution-diagrams/assets/
+#      editable-diagram-examples/*.drawio (real-world variations)
+#   3. SAP/architecture-center/docs/ref-arch/RA*/drawio/*.drawio
 SAP_PALETTE = {
-    # Primary
-    "#0070F2", "#EBF8FF", "#002A86", "#00185A",
-    # Neutral
-    "#475E75", "#F5F6F7", "#556B82", "#1D2D3E", "#D5DADD", "#EDEFF0",
-    # Accent
-    "#5D36FF", "#F1ECFF", "#470BED", "#7F00FF",
-    # Success / authentication
-    "#188918", "#F5FAE5", "#266F3A",
-    # Trust / pink
-    "#CC00DC", "#FFF0FA",
-    # Teal
-    "#07838F", "#DAFDF5",
-    # Basics
+    # --- foundation.md primary -------------------------------------------------
+    "#0070F2", "#EBF8FF",          # SAP / BTP area: border, fill
+    "#475E75", "#F5F6F7",          # Non-SAP area: border, fill
+    "#1D2D3E",                     # Title text
+    "#556B82",                     # Body text
+    # --- foundation.md semantic ------------------------------------------------
+    "#188918", "#F5FAE5",          # Positive (authentication flows)
+    "#C35500", "#FFF8D6",          # Critical
+    "#D20A0A", "#FFEAF4",          # Negative
+    # --- foundation.md accent (sparingly) -------------------------------------
+    "#07838F", "#DAFDF5",          # Teal
+    "#5D36FF", "#F1ECFF",          # Indigo (authorization flows)
+    "#CC00DC", "#FFF0FA",          # Pink (trust flows)
+    # --- preset (in drawio-config-all-in-one.json) ----------------------------
+    "#793802",                     # Brown — present in preset, no documented role
+    # --- darker text / accent variants used in real SAP diagrams --------------
+    "#002A86", "#00185A",          # darker SAP blue (used for ABAP-system / hero accents)
+    "#266F3A",                     # darker positive green
+    "#470BED",                     # darker indigo (preset variant of #5D36FF)
+    "#7F00FF",                     # alt accent purple
+    # --- observed grey / neutral variations (real SAP files) ------------------
+    "#1A2733",                     # near-black navy used by some diagrams
+    "#354A5F",                     # mid grey
+    "#475E74", "#475F75",          # off-by-one variants of #475E75
+    "#5B738B",                     # lighter grey
+    "#595959",
+    "#D5DADD", "#EAECEE", "#EDEFF0", "#EAF8FF", "#EDF8FF", "#ECF8FF",
+    "#FCFCFC",
+    # --- basics ----------------------------------------------------------------
     "#FFFFFF", "#FFF", "#000000", "#000",
-    # Observed variations in SAP ref-arch templates
-    "#1A2733", "#354A5F", "#475E74", "#475F75", "#5B738B",
-    "#595959", "#EAECEE", "#EAF8FF",
 }
 
 COMMENT_RE = re.compile(r"<!--.*?-->", re.S)

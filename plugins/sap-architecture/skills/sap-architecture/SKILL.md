@@ -38,13 +38,44 @@ Keep this plan short — a 10-line bullet list is plenty. Don't skip it: diagram
 
 ### 2. Pick a reference template
 
-Copy the closest bundled `.drawio` from `assets/reference-examples/` into the target location:
+Copy the closest bundled `.drawio` from `assets/reference-examples/` into the target location. **27 reference templates** are bundled, all Apache-2.0, sourced verbatim from `SAP/btp-solution-diagrams` (prefix `btp_`) and `SAP/architecture-center` (prefix `ac_`).
 
-| Reference | Best for |
+| Reference (prefix `btp_`) | Best for |
 |-----------|----------|
-| `SAP_Cloud_Identity_Services_Authentication_L2.drawio` | Identity / OAuth / trust / sign-in flows (IAS ↔ XSUAA, SSO) |
-| `SAP_Private_Link_Service_L2.drawio` | Subaccount → hyperscaler private network, destination + connectivity |
-| `SAP_Task_Center_L2.drawio` | BTP service consuming multiple backend systems via Destination Service |
+| `SAP_Task_Center_L0.drawio` / `_L1` / `_L2` | Multi-backend aggregation; 3 levels in one family — pick by audience |
+| `SAP_Build_Work_Zone_L2.drawio` | Digital workplace launchpad on BTP |
+| `SAP_Build_Process_Automation_L2.drawio` | Workflow + RPA scenarios |
+| `SAP_Cloud_Identity_Services_Authentication_L2.drawio` | IAS authentication / OAuth flow (the canonical IAM diagram) |
+| `SAP_Cloud_Identity_Services_Authentication_preset_L2.drawio` | Reusable IAS-auth building blocks |
+| `SAP_Cloud_Identity_Services_Authorization_L1.drawio` | Role collections, scope mapping (L1 conceptual) |
+| `SAP_Cloud_Identity_Services_Identity_Lifecycle_L1.drawio` | Identity Provisioning lifecycle |
+| `SAP_Private_Link_Service_L2.drawio` | Subaccount → hyperscaler private network |
+| `SAP_Start_L2.drawio` | SAP Start mobile entry-point landscape |
+
+| Reference (prefix `ac_`) | Best for |
+|-----------|----------|
+| `ac_RA0006_PrivateLinkService.drawio` | Secure connectivity to hyperscaler |
+| `ac_RA0007_SuSaaS_CAP_Multitenant.drawio` | Multitenant SaaS CAP architecture |
+| `ac_RA0009_TaskCenter_CentralInbox.drawio` | Task Center central inbox (full ref-arch variant) |
+| `ac_RA0010_BuildWorkZone.drawio` | Build Work Zone (full ref-arch variant) |
+| `ac_RA0014_OData_AppRouter_PrivateLink.drawio` | OData via App Router with Private Link |
+| `ac_RA0014_OData_CAP_PrivateLink.drawio` | OData via CAP with Private Link |
+| `ac_RA0019_IAM_overview.drawio` | Full IAM solution diagram (use as parent) |
+| `ac_RA0019_Authentication.drawio` | IAM authentication / SSO sub-diagram |
+| `ac_RA0019_IdentityLifecycle.drawio` | IAM identity lifecycle sub-diagram |
+| `ac_RA0019_Authorization.drawio` | IAM authorization design sub-diagram |
+| `ac_RA0023_DevOps.drawio` | DevOps with SAP BTP (CI/CD landscape) |
+| `ac_RA0024_Joule_IAM_authn.drawio` | Joule authentication into S/4HANA |
+| `ac_RA0024_Joule_IAM_CDM.drawio` | Joule CDM / Common Data Model integration |
+| `ac_RA0029_AgenticAI_root.drawio` | Agentic AI / AI agents root architecture |
+| `ac_RA0029_A2A_MCP.drawio` | A2A and MCP protocol architecture (closest match for ARC-1 / MCP scenarios) |
+| `ac_RA0029_GenAI_ProCode.drawio` | Pro-code AI agents on BTP |
+
+**Selection guidance:**
+
+1. Pick the level first (L0/L1/L2) — `levels.md`.
+2. Pick the closest **scenario family**: identity → IAS / IAM templates; data flow → Task Center / Build Work Zone; networking → Private Link / OData PrivateLink; AI → RA0029 family; multitenancy → SuSaaS.
+3. If two templates are close, prefer the simpler one. Don't try to inherit the busiest available diagram.
 
 Preserve the title band, zone containers, legend (if any), SAP logo, and canvas size (`1169 × 827`). Rename `<diagram name="…">` to your subject. Delete the inner cards and edges but keep ONE of each as a styling template.
 
@@ -70,22 +101,31 @@ Common service → canonical library name hints: "Destination Service" → `sap-
 
 ### 4. Compose the XML
 
-Build the full `.drawio` file following these references:
+Build the full `.drawio` file following these references (every value cited back to the SAP guideline):
 
-- `references/layout.md` — canvas, zones, title band, network bar
-- `references/palette-and-typography.md` — exact hex values and font sizes
-- `references/shapes-and-edges.md` — zone / card / pill / edge style strings
+- `references/levels.md` — L0 / L1 / L2 audience definitions + canvas conventions
+- `references/layout.md` — canvas skeleton, zones, title band, network bar
+- `references/palette-and-typography.md` — Horizon hex values + Helvetica hierarchy
+- `references/shapes-and-edges.md` — zone / card / pill / edge style strings, semantic line colors
+- `references/do-and-dont.md` — consolidated SAP rules (alternation, color proportion, one-logo, line-style semantics, …)
 
-Rules that matter most (from research — these are the ones every junior attempt gets wrong):
+Rules that matter most (the ones every junior attempt gets wrong):
 
 1. **Centers must align for straight edges.** For an `orthogonalEdgeStyle` edge between A and B to render without a kink, either `A.centerX == B.centerX` or `A.centerY == B.centerY`. See `shapes-and-edges.md`.
-2. **`absoluteArcSize=1` next to every `arcSize`.** Without it, 16 is percent and zones get 130-px-radius corners.
+2. **`absoluteArcSize=1` next to every `arcSize`.** Without it, 16 is percent and zones get 130-px-radius corners. SAP fixes corner radius at **16 px** ([`areas.md`](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/areas.md)).
 3. **`labelBackgroundColor=default` on every edge label.** Else text bleeds into the `#EBF8FF` BTP fill.
-4. **All x/y/w/h integers, multiples of 10.** No `239.9999…` garbage.
-5. **Font family: Helvetica.** No Arial, no default sans-serif.
+4. **All x/y/w/h integers, multiples of 10.** No `239.9999…` garbage. Spacing rule of thumb: **≈ height of SAP logo** ([`foundation.md`](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/foundation.md)).
+5. **Font family: Helvetica.** Every published SAP `.drawio` uses Helvetica. (The doc mentions Arial only as a customFont you can add to your draw.io install.)
 6. **Inline top-left zone labels.** Never a separate header tab.
 7. **Pills float on `parent="1"`**, not as children of a zone.
-8. **Don't draw a legend inside the canvas.** SAP ref-arch puts the narration in the hosting Markdown page.
+8. **Connector colors are SAP-mandated:** trust = pink (`#CC00DC`), authentication = green (`#188918`), authorization = indigo (`#5D36FF`), firewalls = thick grey ([`lines_connectors.md`](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/lines_connectors.md)).
+9. **Line styles are SAP-mandated:** solid = sync request/response, dashed = async, dotted = optional, **thick = firewall only** ([`foundation.md`](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/foundation.md)).
+10. **Alternate fill / no-fill when nesting zones.** Parent is the BTP layer ([`areas.md`](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/areas.md)).
+11. **Use the grey-circle service icons** — mandatory per SAP. The bundled library is the grey-circle variant.
+12. **One SAP logo per diagram.** Don't sprinkle them on every card ([`product_names.md`](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/product_names.md)).
+13. **Don't roll your own arrows.** Use library arrows; recolour with `strokeColor` only.
+14. **Legend mandatory in L1/L2; skip in L0.** ([`big_picture.md`](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/solution_diagr_intro/big_picture.md))
+15. **Don't draw flow narration inside the canvas.** SAP convention puts the prose in the hosting Markdown page below the embedded image.
 
 ### 5. Validate & autofix — MANDATORY
 
@@ -132,19 +172,22 @@ Finally, print the **flow narration** — a numbered list that spells out what e
 ## Supporting files
 
 ```
-.claude/skills/sap-architecture/
+sap-architecture/
 ├── SKILL.md                       (this file)
-├── README.md                      — user-facing documentation / examples
 ├── references/
-│   ├── levels.md                  — L0 / L1 / L2 / L3 decision guide + canvas conventions
-│   ├── palette-and-typography.md  — Horizon hex values + Helvetica hierarchy
-│   ├── shapes-and-edges.md        — style strings + center-alignment rule
-│   └── layout.md                  — canvas skeleton + zone-by-zone placement
+│   ├── levels.md                  — L0 / L1 / L2 audience definitions + canvas
+│   ├── palette-and-typography.md  — Horizon hex + Helvetica hierarchy + all SAP rules
+│   ├── shapes-and-edges.md        — style strings + center-alignment + line semantics
+│   ├── layout.md                  — canvas skeleton + zone-by-zone placement
+│   └── do-and-dont.md             — consolidated SAP rules with verbatim quotes
 ├── assets/
 │   ├── libraries/
-│   │   └── btp-service-icons-all-size-M.xml  — 100 SAP BTP service icons
-│   ├── reference-examples/        — 3 pristine L2 SAP ref-arch templates
-│   └── icon-index.json            — slug → library label + ready-to-paste mxCell style
+│   │   └── btp-service-icons-all-size-M.xml  — 99 SAP BTP service icons
+│   ├── reference-examples/        — 27 pristine SAP ref-arch templates (Apache-2.0)
+│   │                                 11 from SAP/btp-solution-diagrams (prefix btp_)
+│   │                                 16 from SAP/architecture-center (prefix ac_)
+│   ├── icon-index.json            — slug → library label + ready-to-paste mxCell style
+│   └── NOTICE.md                  — Apache-2.0 attribution for SAP assets
 └── scripts/
     ├── build_icon_index.py        — regenerate icon-index.json after library refresh
     ├── extract_icon.py            — fuzzy service name → mxCell with grid-snapped geometry

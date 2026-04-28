@@ -5,14 +5,14 @@
     "github": "marianfoo"
   },
   "description": "A Claude Code plugin that authors SAP Architecture Center / BTP solution diagrams as draw.io files — Horizon palette, grey-circle icons, L0-L3 level conventions, validated and autofixed before save.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "repository": "https://github.com/marianfoo/btp-drawio-skill",
   "plugins": [
     {
       "name": "sap-architecture",
       "source": "./plugins/sap-architecture",
       "description": "Generate, validate, and autofix SAP / BTP / on-prem architecture diagrams as .drawio files following the official SAP BTP Solution Diagram Guidelines. Bundles 99 SAP BTP service icons + 3 pristine L2 templates.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "Marian Zeis",
         "github": "marianfoo"

@@ -107,8 +107,27 @@ def fix_font_family(text: str, stats: dict[str, int]) -> str:
     return re.sub(r"fontFamily=([^;\"]+)", repl, text)
 
 
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+
+
+def fix_strip_comments(text: str, stats: dict[str, int]) -> str:
+    n = len(_COMMENT_RE.findall(text))
+    if n:
+        stats["xml_comments"] += n
+        text = _COMMENT_RE.sub("", text)
+    return text
+
+
 def apply_all(text: str) -> tuple[str, dict[str, int]]:
-    stats = {"geometry": 0, "hex_case": 0, "arc_size": 0, "stroke_width": 0, "font_family": 0}
+    stats = {
+        "geometry": 0,
+        "hex_case": 0,
+        "arc_size": 0,
+        "stroke_width": 0,
+        "font_family": 0,
+        "xml_comments": 0,
+    }
+    text = fix_strip_comments(text, stats)
     text = fix_geometry(text, stats)
     text = fix_hex_case(text, stats)
     text = fix_arc_size(text, stats)

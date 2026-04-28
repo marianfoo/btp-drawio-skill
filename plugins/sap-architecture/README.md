@@ -20,20 +20,27 @@ sap-architecture/
     └── sap-architecture/
         ├── SKILL.md                       — main workflow (6 steps, <500 lines)
         ├── references/                    — loaded on demand by SKILL.md
-        │   ├── levels.md                  — L0/L1/L2/L3 decision guide
-        │   ├── palette-and-typography.md  — Horizon hex + Helvetica hierarchy
-        │   ├── shapes-and-edges.md        — style strings + center-alignment rule
-        │   └── layout.md                  — canvas skeleton + zone-by-zone placement
+        │   ├── levels.md                  — L0/L1/L2 decision guide
+        │   ├── palette-and-typography.md  — Horizon hex + Helvetica + SAP rules
+        │   ├── shapes-and-edges.md        — style strings + line / connector semantics
+        │   ├── layout.md                  — canvas skeleton + zone-by-zone placement
+        │   ├── do-and-dont.md             — consolidated SAP rules with verbatim quotes
+        │   └── methodology.md             — comparison harness, fidelity claim
         ├── assets/
         │   ├── libraries/                 — 99 SAP BTP service icons (inline SVG)
-        │   ├── reference-examples/        — 3 pristine SAP L2 templates
+        │   ├── reference-examples/        — 27 pristine SAP templates
+        │   │                                  11 from SAP/btp-solution-diagrams (btp_)
+        │   │                                  16 from SAP/architecture-center (ac_)
         │   ├── icon-index.json            — pre-computed slug → mxCell style lookup
-        │   └── NOTICE.md                  — SAP asset attribution (Apache-2.0)
+        │   └── NOTICE.md                  — per-file SAP attribution (Apache-2.0)
+        ├── examples/
+        │   └── iam-arc1-mcp-l2.drawio     — worked example (compare.py scores 100/100)
         └── scripts/
             ├── build_icon_index.py        — regenerate icon-index.json
             ├── extract_icon.py            — fuzzy icon name → mxCell
             ├── validate.py                — structural + style validator
-            └── autofix.py                 — mechanical fixes
+            ├── autofix.py                 — mechanical fixes
+            └── compare.py                 — fingerprint + similarity score vs SAP refs
 ```
 
 ## How it triggers
