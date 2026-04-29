@@ -176,6 +176,48 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/score_corpus.py
 
 `score_corpus.py` compares the candidate against all bundled SAP references and exits nonzero if the best score is below the threshold. For deeper research loops, pass cloned SAP repos with `--references /path/to/SAP/architecture-center --references /path/to/SAP/btp-solution-diagrams`.
 
+### Run an Ollama-backed corpus evaluation loop
+
+`eval_corpus.py` orchestrates the longer feedback loop: inventory SAP references, extract diagram descriptions, ask a local model for a generation plan, create candidates, run `autofix.py` + `validate.py`, score against the corpus, and write reports under `.cache/sap-architecture-eval/`.
+
+Fast smoke checks:
+
+```bash
+python3 -m py_compile plugins/sap-architecture/skills/sap-architecture/scripts/*.py
+
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py inventory
+
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py describe \
+  --limit 3
+
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py dry-run \
+  --limit 3 --generator ollama --model qwen3.6:35b-a3b-nvfp4
+```
+
+One-case Ollama smoke:
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py run \
+  --limit 1 \
+  --generator ollama \
+  --model qwen3.6:35b-a3b-nvfp4 \
+  --max-attempts 1 \
+  --min-score 90
+```
+
+Long runs are opt-in:
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py run \
+  --generator ollama \
+  --model qwen3.6:35b-a3b-nvfp4 \
+  --max-attempts 3 \
+  --min-score 90 \
+  --continue-on-error
+```
+
+Generated candidates, raw model output, `summary.json`, and `report.md` are written below `.cache/` and are intentionally untracked. Curate any useful examples into the repo only after reviewing them.
+
 ### Validate an existing `.drawio`
 
 ```bash
@@ -317,7 +359,8 @@ btp-drawio-skill/
                     ├── autofix.py
                     ├── select_reference.py
                     ├── compare.py         ← pairwise fingerprint score
-                    └── score_corpus.py    ← best score across reference corpus
+                    ├── score_corpus.py    ← best score across reference corpus
+                    └── eval_corpus.py     ← Ollama-ready corpus evaluation loop
 ```
 
 ---

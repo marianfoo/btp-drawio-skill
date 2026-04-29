@@ -11,6 +11,9 @@ venv/
 # draw.io autofix backups
 *.drawio.bak
 
+# Generated evaluation runs
+.cache/
+
 # Editor / OS
 .DS_Store
 .idea/

@@ -43,7 +43,8 @@ sap-architecture/
             ├── autofix.py                 — mechanical fixes
             ├── select_reference.py        — prompt → ranked SAP templates
             ├── compare.py                 — pairwise fingerprint score vs SAP refs
-            └── score_corpus.py            — best score across the reference corpus
+            ├── score_corpus.py            — best score across the reference corpus
+            └── eval_corpus.py             — smoke-first Ollama corpus evaluation loop
 ```
 
 ## How it triggers
@@ -82,6 +83,7 @@ All scripts use only the Python standard library — zero pip install required.
 | `autofix.py --write <file>` | Mechanical fixer: grid snap, hex case, `absoluteArcSize=1`, `strokeWidth` rounding, `fontFamily`→Helvetica. Writes a `.bak` backup. |
 | `compare.py <reference> <candidate>` | Pairwise structural/style fingerprint score. |
 | `score_corpus.py <candidate>` | Score a candidate against all bundled references; `--min-score 90` makes it a gate. |
+| `eval_corpus.py run --generator ollama` | Opt-in corpus loop for local Ollama experiments. Writes candidates and reports under `.cache/sap-architecture-eval/`. |
 | `build_icon_index.py` | Re-parse `assets/libraries/*.xml` into `assets/icon-index.json`. Run after refreshing the library from SAP upstream. |
 
 See [root README › Use the scripts directly](../../README.md#use-the-scripts-directly-no-llm) for full examples.

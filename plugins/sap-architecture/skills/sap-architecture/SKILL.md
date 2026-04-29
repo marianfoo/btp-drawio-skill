@@ -182,6 +182,7 @@ sap-architecture/
     ├── select_reference.py        — request text → ranked SAP template candidates
     ├── compare.py                 — pairwise fingerprint score against one reference
     ├── score_corpus.py            — candidate → best score across all references
+    ├── eval_corpus.py             — opt-in Ollama corpus evaluation loop
     ├── validate.py                — structural + alignment + text-fit + palette checks
     └── autofix.py                 — mechanical fixes (grid, hex case, arcSize, strokeWidth)
 ```
