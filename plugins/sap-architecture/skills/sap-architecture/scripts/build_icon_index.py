@@ -34,6 +34,17 @@ def clean(label: str) -> str:
     return label
 
 
+def display_from_title(title: str | None) -> str:
+    if not title:
+        return ""
+    title = re.sub(r"^\d+-", "", title)
+    title = re.sub(r"_sd$", "", title)
+    title = title.replace("-", " ")
+    title = re.sub(r"\s+", " ", title).strip()
+    acronyms = {"sap": "SAP", "btp": "BTP", "hana": "HANA", "abap": "ABAP"}
+    return " ".join(acronyms.get(part, part.capitalize()) for part in title.split())
+
+
 def slugify(name: str) -> str:
     s = name.lower()
     s = re.sub(r"[^a-z0-9]+", "-", s)
@@ -59,7 +70,7 @@ def build() -> dict[str, dict]:
             continue
         raw_label = cell.group(1)
         style = cell.group(2)
-        label = clean(raw_label)
+        label = clean(raw_label) or display_from_title(entry.get("title"))
         slug = slugify(label)
         if not slug:
             continue

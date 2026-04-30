@@ -11,7 +11,7 @@
     {
       "name": "sap-architecture",
       "source": "./plugins/sap-architecture",
-      "description": "Generate, validate, score, and autofix SAP / BTP / on-prem architecture diagrams as .drawio files following the official SAP BTP Solution Diagram Guidelines. Bundles 99 SAP BTP service icons + 63 SAP reference templates.",
+      "description": "Generate, validate, score, and autofix SAP / BTP / on-prem architecture diagrams as .drawio files following the official SAP BTP Solution Diagram Guidelines. Bundles 100 SAP BTP service icons, 448 indexed SAP draw.io starter-kit assets, and 63 SAP reference templates.",
       "version": "0.3.0",
       "author": {
         "name": "Marian Zeis",

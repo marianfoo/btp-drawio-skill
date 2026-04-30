@@ -69,13 +69,25 @@ python3 .claude/skills/sap-architecture/scripts/extract_icon.py "Destination Ser
 ```
 
 The script:
-- Fuzzy-matches the service name against the 99-icon index (`assets/icon-index.json`)
+- Fuzzy-matches the service name against the 100-icon index (`assets/icon-index.json`)
 - Emits a ready-to-paste `<mxCell>` with the exact SVG data URI the SAP library ships
 - Snaps `x/y/w/h` to the 10-px grid
 
 To list all available icons: `extract_icon.py --list`
 
 Common service → canonical library name hints: "Destination Service" → `sap-destination-service`, "XSUAA" / "Authorization & Trust" → `sap-authorization-and-trust-management-service`, "Cloud Connector" → `cloud-connector`, "Audit Log" → `sap-audit-log-service`.
+
+For non-service SAP starter-kit assets, use `extract_asset.py` instead. It covers the full indexed library surface: BTP service icons, generic icons, connector presets, area/default shapes, essential shapes, number markers, SAP brand-name text, text elements, and annotation/interface pills.
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/extract_asset.py --list --kind connector
+python3 .claude/skills/sap-architecture/scripts/extract_asset.py "direct one-directional" \
+  --kind connector --id flow-auth --x 200 --y 300
+python3 .claude/skills/sap-architecture/scripts/extract_asset.py "devices non sap" \
+  --kind generic-icon --id ext-devices --x 100 --y 200
+```
+
+Prefer these library assets over hand-authored arrows, number bubbles, interface pills, generic device/user icons, or product-name text. SAP explicitly provides these custom draw.io libraries as the starter kit; matching them is higher fidelity than recreating the shapes by style string.
 
 ### 4. Compose the XML
 
@@ -170,15 +182,22 @@ sap-architecture/
 │   └── corpus-findings.md         — 2026 corpus profile from SAP's public repos
 ├── assets/
 │   ├── libraries/
-│   │   └── btp-service-icons-all-size-M.xml  — 99 SAP BTP service icons
+│   │   ├── btp-service-icons-all-size-M.xml  — 100 SAP BTP service icons
+│   │   ├── sap-generic-icons-size-M-200302.xml
+│   │   ├── connectors.xml / area_shapes.xml / default_shapes.xml
+│   │   └── essentials.xml / numbers.xml / sap_brand_names.xml / text_elements.xml / annotations_and_interfaces.xml
 │   ├── reference-examples/        — 63 pristine SAP ref-arch templates (Apache-2.0)
 │   │                                 11 from SAP/btp-solution-diagrams (prefix btp_)
 │   │                                 52 from SAP/architecture-center (prefix ac_)
 │   ├── icon-index.json            — slug → library label + ready-to-paste mxCell style
+│   ├── asset-index.json           — 448 SAP draw.io assets across 10 libraries
 │   └── NOTICE.md                  — Apache-2.0 attribution for SAP assets
 └── scripts/
     ├── build_icon_index.py        — regenerate icon-index.json after library refresh
+    ├── build_asset_index.py       — regenerate asset-index.json after library refresh
     ├── extract_icon.py            — fuzzy service name → mxCell with grid-snapped geometry
+    ├── extract_asset.py           — fuzzy any SAP starter-kit asset → mxCell snippet
+    ├── check_asset_coverage.py    — smoke-check library/index/palette coverage
     ├── select_reference.py        — request text → ranked SAP template candidates
     ├── compare.py                 — pairwise fingerprint score against one reference
     ├── score_corpus.py            — candidate → best score across all references

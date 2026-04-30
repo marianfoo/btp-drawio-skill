@@ -19,6 +19,14 @@ from xml.sax.saxutils import escape
 
 HERE = Path(__file__).resolve().parent
 INDEX = HERE.parent / "assets" / "icon-index.json"
+ASSET_INDEX = HERE.parent / "assets" / "asset-index.json"
+
+try:
+    from extract_asset import emit_asset as emit_general_asset
+    from extract_asset import find_asset as find_general_asset
+except ImportError:  # pragma: no cover - fallback for copied standalone script use
+    emit_general_asset = None
+    find_general_asset = None
 
 
 def load_index() -> dict:
@@ -26,6 +34,12 @@ def load_index() -> dict:
         print(f"icon index not found at {INDEX}; run build_icon_index.py first", file=sys.stderr)
         sys.exit(1)
     return json.loads(INDEX.read_text(encoding="utf-8"))
+
+
+def load_asset_index() -> dict | None:
+    if not ASSET_INDEX.exists() or emit_general_asset is None or find_general_asset is None:
+        return None
+    return json.loads(ASSET_INDEX.read_text(encoding="utf-8"))
 
 
 def _normalize(text: str) -> str:
@@ -137,14 +151,31 @@ def main() -> int:
     ap.add_argument("--label", default=None, help="Override icon label text")
     args = ap.parse_args()
 
+    asset_index = load_asset_index()
     index = load_index()
     if args.list:
-        for slug in sorted(index):
-            print(f"{slug:60s}  {index[slug]['display']}")
+        if asset_index:
+            assets = asset_index["assets"]
+            for key in sorted(assets):
+                entry = assets[key]
+                if entry["kind"] == "btp-service-icon":
+                    slug = key.split(":", 1)[1]
+                    print(f"{slug:60s}  {entry['display']}")
+        else:
+            for slug in sorted(index):
+                print(f"{slug:60s}  {index[slug]['display']}")
         return 0
     if not args.query:
         ap.print_usage(sys.stderr)
         return 2
+
+    if asset_index and find_general_asset and emit_general_asset:
+        asset_match = find_general_asset(asset_index, args.query, "btp-service-icon")
+        if asset_match:
+            slug, asset = asset_match
+            print(emit_general_asset(asset, args))
+            print(f"# matched: {slug} — {asset['display']}", file=sys.stderr)
+            return 0
 
     match = find(index, args.query)
     if not match:

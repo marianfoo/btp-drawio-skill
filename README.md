@@ -3,7 +3,8 @@
 A Claude Code plugin (and Agent-Skill-compatible standalone skill) that authors **SAP Architecture Center / BTP solution diagrams** as draw.io files from a natural-language description — following the **official SAP BTP Solution Diagram Guidelines**.
 
 Bundles:
-- **99 SAP BTP service icons** (inline SVG data URIs, grey-background-circle variant — the one [SAP mandates](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/icons.md) for diagrams)
+- **100 SAP BTP service icons** (inline SVG data URIs, grey-background-circle variant — the one [SAP mandates](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/icons.md) for diagrams)
+- **448 indexed SAP draw.io starter-kit assets** across 10 bundled libraries: BTP service icons, generic icons, connector presets, area/default shapes, essential shapes, number markers, SAP brand-name text, text elements, and annotation/interface pills
 - **63 pristine reference templates** (Apache-2.0): all 11 canonical examples from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams) plus 52 curated reference architectures from [`SAP/architecture-center`](https://github.com/SAP/architecture-center), covering IAM, Joule, MCP / Agentic AI, multitenant SaaS, DevOps, Private Link, Event-Driven Architecture, resiliency, Business Data Cloud, integration, SIEM/SOAR, and SuccessFactors
 - **7 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, corpus findings, and the comparison methodology — every value cited from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/) or observed in SAP's public corpus
 - **A validator** (`validate.py`) that catches bent arrows, clipped labels, off-palette colors, off-grid coordinates, duplicate ids, missing `labelBackgroundColor`, and XML comments
@@ -130,7 +131,7 @@ The plugin's Python scripts have zero third-party dependencies (stdlib only) and
 
 ```bash
 python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_icon.py --list
-# → 99 icons, one per line: slug + display name
+# → 100 icons, one per line: slug + display name
 ```
 
 ### Generate a ready-to-paste `<mxCell>` for a service icon
@@ -143,6 +144,26 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_icon.py
 ```
 
 Fuzzy matching is built in — `"XSUAA"`, `"CPI"`, `"HANA"`, `"Cloud Connector"`, `"Audit Log"`, `"Authorization and Trust"` all resolve correctly.
+
+### List or extract any SAP starter-kit asset
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_asset.py --list --kind connector
+
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_asset.py \
+  "direct one-directional" \
+  --kind connector \
+  --x 200 --y 300 \
+  --id flow1
+
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_asset.py \
+  "devices non sap" \
+  --kind generic-icon \
+  --x 100 --y 200 \
+  --id generic-devices
+```
+
+`extract_asset.py` reads `assets/asset-index.json`, which covers all bundled SAP draw.io starter-kit libraries, not only BTP service icons. Use it for generic icons, connector presets, area/default shapes, essential shapes, number bubbles, SAP brand-name text, text styles, and interface/annotation pills.
 
 ### Pick the closest SAP template from a prompt
 
@@ -255,12 +276,14 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/autofix.py --wr
 
 Autofix automatically repairs: grid snapping, hex case, missing `absoluteArcSize=1`, `strokeWidth` rounding to `{1, 1.5, 2, 3, 4}`, non-Helvetica fonts.
 
-### Regenerate the icon index
+### Regenerate the asset indexes
 
-After refreshing the bundled icon library:
+After refreshing bundled SAP libraries:
 
 ```bash
 python3 plugins/sap-architecture/skills/sap-architecture/scripts/build_icon_index.py
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/build_asset_index.py
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/check_asset_coverage.py
 ```
 
 ---
@@ -346,15 +369,19 @@ btp-drawio-skill/
                 │   ├── corpus-findings.md ← 2026 SAP corpus profile
                 │   └── methodology.md     ← comparison harness, fidelity claim
                 ├── assets/
-                │   ├── libraries/         ← 99-icon BTP library (Apache-2.0)
+                │   ├── libraries/         ← 10 SAP draw.io libraries (Apache-2.0)
                 │   ├── reference-examples/ ← 63 pristine SAP templates (Apache-2.0)
                 │   ├── icon-index.json    ← pre-computed slug→mxCell style lookup
+                │   ├── asset-index.json   ← 448 searchable SAP starter-kit assets
                 │   └── NOTICE.md          ← per-file Apache-2.0 attribution
                 ├── examples/
                 │   └── iam-arc1-mcp-l2.drawio  ← worked example (scored 100/100)
                 └── scripts/
                     ├── build_icon_index.py
+                    ├── build_asset_index.py
                     ├── extract_icon.py
+                    ├── extract_asset.py
+                    ├── check_asset_coverage.py
                     ├── validate.py
                     ├── autofix.py
                     ├── select_reference.py
@@ -395,12 +422,14 @@ claude --plugin-dir ./plugins/sap-architecture
     done
 ```
 
-### Regenerating the icon index
+### Regenerating the asset indexes
 
-After refreshing `assets/libraries/btp-service-icons-all-size-M.xml` from the SAP upstream:
+After refreshing `assets/libraries/*.xml` from the SAP upstream:
 
 ```bash
 python3 plugins/sap-architecture/skills/sap-architecture/scripts/build_icon_index.py
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/build_asset_index.py
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/check_asset_coverage.py
 ```
 
 ---
