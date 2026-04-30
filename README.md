@@ -186,7 +186,7 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/compare.py --sc
   reference.drawio my-diagram.drawio
 ```
 
-Calibration: a hand-crafted candidate built from scratch typically scores 50-55. A candidate built by copying a SAP reference template + relabeling for your scenario scores 95-100. See [`references/methodology.md`](plugins/sap-architecture/skills/sap-architecture/references/methodology.md) for the full breakdown.
+Calibration: a hand-crafted candidate built from scratch typically scores 50-55. A candidate built by copying a SAP reference template + relabeling for your scenario scores roughly 95-100 structurally, while visible label/content drift now lowers the target score. See [`references/methodology.md`](plugins/sap-architecture/skills/sap-architecture/references/methodology.md) for the full breakdown.
 
 ### Score a diagram against the whole bundled corpus
 
@@ -199,7 +199,7 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/score_corpus.py
 
 ### Run an Ollama-backed corpus evaluation loop
 
-`eval_corpus.py` orchestrates the longer feedback loop: inventory SAP references, extract diagram descriptions, ask a local model for a generation plan, create candidates, run `autofix.py` + `validate.py`, score against the corpus, and write reports under `.cache/sap-architecture-eval/`.
+`eval_corpus.py` orchestrates the longer feedback loop: inventory SAP references, extract diagram descriptions, ask a local model for a generation plan, create candidates, run `autofix.py` + `validate.py`, score against the specific target reference and the whole corpus, and write reports under `.cache/sap-architecture-eval/`. The default pass mode is target-aware; corpus-only scoring is still available with `--pass-mode corpus`.
 
 Fast smoke checks:
 
@@ -226,12 +226,28 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py 
   --min-score 90
 ```
 
+Honest leave-one-out smoke, where the harness may not copy the target diagram:
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py run \
+  --limit 3 \
+  --generator ollama \
+  --model qwen3.6:35b-a3b-nvfp4 \
+  --exclude-target-template \
+  --apply-model-plan \
+  --max-attempts 1 \
+  --min-score 90 \
+  --continue-on-error
+```
+
 Long runs are opt-in:
 
 ```bash
 python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py run \
   --generator ollama \
   --model qwen3.6:35b-a3b-nvfp4 \
+  --exclude-target-template \
+  --apply-model-plan \
   --max-attempts 3 \
   --min-score 90 \
   --continue-on-error
@@ -296,7 +312,7 @@ When triggered, the skill runs a 6-step pipeline (documented in full in [`plugin
 2. **Pick reference template** — run `select_reference.py`, then copy the closest pristine `.drawio` from the 63 bundled templates in `assets/reference-examples/`. *Never draw from scratch.*
 3. **Place BTP service icons** — fuzzy-lookup each service via `extract_icon.py`, which emits an `<mxCell>` with the official inline-SVG data URI and grid-snapped geometry.
 4. **Compose the XML** — fill in the zones, cards, edges, and pills following `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`.
-5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py`, then `score_corpus.py --min-score 90`. The skill doesn't hand you a diagram until validation passes and the corpus score is close to SAP's templates.
+5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py`, then `score_corpus.py --min-score 90`. Evaluation runs also score against the specific target reference; the skill doesn't hand you a diagram until validation passes and the score is close to SAP's templates.
 6. **Narrate the flow** — print a numbered list explaining what each pill means, for pasting below the embedded image in Markdown / Confluence.
 
 ---
@@ -375,7 +391,7 @@ btp-drawio-skill/
                 │   ├── asset-index.json   ← 448 searchable SAP starter-kit assets
                 │   └── NOTICE.md          ← per-file Apache-2.0 attribution
                 ├── examples/
-                │   └── iam-arc1-mcp-l2.drawio  ← worked example (scored 100/100)
+                │   └── iam-arc1-mcp-l2.drawio  ← worked example (96.6 vs source; 100 self-check)
                 └── scripts/
                     ├── build_icon_index.py
                     ├── build_asset_index.py

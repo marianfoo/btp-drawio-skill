@@ -36,7 +36,7 @@ sap-architecture/
         │   ├── asset-index.json           — 448 searchable SAP draw.io assets
         │   └── NOTICE.md                  — per-file SAP attribution (Apache-2.0)
         ├── examples/
-        │   └── iam-arc1-mcp-l2.drawio     — worked example (compare.py scores 100/100)
+        │   └── iam-arc1-mcp-l2.drawio     — worked example (96.6 vs source template; 100 self-check)
         └── scripts/
             ├── build_icon_index.py        — regenerate icon-index.json
             ├── build_asset_index.py       — regenerate asset-index.json
@@ -70,7 +70,7 @@ For generic diagrams (flowcharts, ER, class) **without** an SAP angle, Claude fa
 2. **Pick reference template** — run `scripts/select_reference.py`, then copy the closest pristine `.drawio` from `assets/reference-examples/`. *Never draw from scratch.*
 3. **Place library assets** — call `scripts/extract_icon.py` for each BTP service and `scripts/extract_asset.py` for generic icons, connector presets, number bubbles, interface pills, and other SAP starter-kit assets.
 4. **Compose XML** — fill in zones, cards, edges, pills per the four `references/*.md` sheets.
-5. **Validate + autofix + score — mandatory** — `autofix.py --write`, `validate.py`, then `score_corpus.py --min-score 90`. The skill will not hand back a diagram until the validator exits clean and the corpus score is high.
+5. **Validate + autofix + score — mandatory** — `autofix.py --write`, `validate.py`, then `score_corpus.py --min-score 90`. Evaluation runs also score against the specific target reference; the skill will not hand back a diagram until the validator exits clean and the fidelity score is high.
 6. **Narrate** — print a numbered markdown list explaining each pill / flow step, for pasting below the embedded image in Confluence / Markdown.
 
 Full details in [`skills/sap-architecture/SKILL.md`](skills/sap-architecture/SKILL.md).
@@ -86,9 +86,9 @@ All scripts use only the Python standard library — zero pip install required.
 | `select_reference.py "<request>"` | Rank bundled SAP templates for a natural-language request. Use before editing XML. |
 | `validate.py <file>` | Structural + style validator. Catches bent arrows, text overflow, off-palette, off-grid, duplicate ids, sibling overlap, missing `labelBackgroundColor`. `--strict` turns warnings into errors. `--json` for machine-readable output. |
 | `autofix.py --write <file>` | Mechanical fixer: grid snap, hex case, `absoluteArcSize=1`, `strokeWidth` rounding, `fontFamily`→Helvetica. Writes a `.bak` backup. |
-| `compare.py <reference> <candidate>` | Pairwise structural/style fingerprint score. |
+| `compare.py <reference> <candidate>` | Pairwise structural/style/content fingerprint score. |
 | `score_corpus.py <candidate>` | Score a candidate against all bundled references; `--min-score 90` makes it a gate. |
-| `eval_corpus.py run --generator ollama` | Opt-in corpus loop for local Ollama experiments. Writes candidates and reports under `.cache/sap-architecture-eval/`. |
+| `eval_corpus.py run --generator ollama` | Opt-in target-aware corpus loop for local Ollama experiments. Use `--exclude-target-template` for honest leave-one-out tests. Writes candidates and reports under `.cache/sap-architecture-eval/`. |
 | `build_icon_index.py` | Re-parse the BTP service icon library into `assets/icon-index.json`. Run after refreshing the library from SAP upstream. |
 | `build_asset_index.py` | Re-parse all bundled SAP draw.io libraries into `assets/asset-index.json`. |
 | `check_asset_coverage.py` | Smoke-check library presence, index counts, SAP Build coverage, and official SAP preset colors. |

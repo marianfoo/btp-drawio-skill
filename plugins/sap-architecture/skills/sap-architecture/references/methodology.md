@@ -14,6 +14,7 @@ A claim like "this plugin produces SAP-Architecture-Center-style diagrams" is on
 | **Fonts** | `fontFamily` values used (subset = full credit) |
 | **Stroke widths** | the set of `strokeWidth` values |
 | **Polish** | presence of `absoluteArcSize=1`, `labelBackgroundColor=default`, grid-snap rate |
+| **Labels** | visible label count and label-token overlap, so wrong-target templates no longer score as perfect |
 
 The score is a weighted blend of these dimensions; 100 means the two files have an identical fingerprint, 0 means nothing in common.
 
@@ -31,7 +32,7 @@ Calibration:
 | Different SAP-published L2 diagrams (e.g. IAS Authentication vs Task Center) | 80–85 |
 | L0 of a scenario vs L2 of the same scenario | 60–70 |
 | Hand-crafted candidate built from scratch | 50–55 |
-| Candidate built by **copying a reference + relabeling** (the recommended workflow) | 95–100 |
+| Candidate built by **copying a reference + relabeling** (the recommended workflow) | 95–100 when the target scenario stays close |
 
 The big gap between "from-scratch" (≈50) and "from-template" (≈100) is the empirical justification for the SKILL.md rule: **never draw from scratch — always start from a reference template.**
 
@@ -91,10 +92,10 @@ The bundled `examples/iam-arc1-mcp-l2.drawio` was produced by:
    - card label: `Mobile/Desktop` → `Claude Desktop / Copilot Studio`
 3. Running `autofix.py --write` (resulted in 436 mechanical fixes — geometry snap, hex case, arc size, font normalisation, comment strip).
 4. Running `validate.py` — exit 0.
-5. Running `compare.py` against the original reference — **scored 100/100**.
-6. Running `score_corpus.py --min-score 90` across the 63 bundled templates — best score **100/100**.
+5. Running `compare.py` against the original reference — **scored 96.6/100** with the target-aware label-token scorer.
+6. Running `score_corpus.py --min-score 90` across the 63 bundled templates — best score **96.6/100**.
 
-This proves the workflow: with a few hand-edits, you get a fingerprint indistinguishable from SAP's canonical example.
+This proves the workflow: with a few hand-edits, you preserve SAP's visual structure while the scorer still notices intentional scenario-label changes.
 
 ## Why the validator + autofix matter
 
@@ -109,7 +110,7 @@ Without these gates, a hand-crafted candidate scored **~52** even when it follow
 
 ## Limitations
 
-The fingerprint compares **structure and style** — not semantic correctness. Two diagrams with identical fingerprints can illustrate completely different scenarios. The score validates "looks SAP-styled" but doesn't validate "the architecture actually works".
+The fingerprint compares **structure, style, and visible label overlap** — not full semantic correctness. Two diagrams with similar fingerprints can still encode different architectures. The score validates "looks SAP-styled and uses similar target labels" but doesn't validate "the architecture actually works".
 
 Also, the validator can't check:
 
@@ -131,7 +132,7 @@ Use this as the final fidelity gate. A good template-derived diagram should have
 
 | Signal | Target |
 |---|---|
-| Best corpus score | `>= 90` |
+| Best target/corpus score | `>= 90` |
 | Chosen-template pairwise score | `>= 90`, ideally `95-100` |
 | Validator errors | `0` |
 | Off-palette / line-style drift | explainable or fixed |

@@ -46,7 +46,7 @@ DEFAULT_TIMEOUT_SECONDS = 600
 VISIBLE_TEXT_LIMIT = 1800
 ANSI_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 CONTROL_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
-EXPECTED_MODEL_KEYS = {"title", "subtitle", "services", "flow_steps", "style_risks"}
+EXPECTED_MODEL_KEYS = {"title", "subtitle", "services", "flow_steps", "style_risks", "template_replacements"}
 
 
 @dataclass
@@ -58,6 +58,7 @@ class EvalCase:
     description: str
     selected_template: str
     selected_template_score: float
+    selected_template_is_target: bool = False
 
 
 @dataclass
@@ -74,6 +75,7 @@ class AttemptResult:
     target_score: float | None = None
     corpus_score: float | None = None
     best_corpus_reference: str | None = None
+    pass_score: float | None = None
     passed: bool = False
     failure: str | None = None
 
@@ -206,6 +208,13 @@ def build_description(path: Path) -> tuple[str, str]:
     return title, clean_text(" ".join(parts))
 
 
+def same_path(a: Path, b: Path) -> bool:
+    try:
+        return a.resolve() == b.resolve()
+    except OSError:
+        return str(a) == str(b)
+
+
 def select_template(description: str, references: list[Path]) -> tuple[Path, float]:
     ranked = sorted((select_reference_score(p, description) for p in references), key=lambda c: (-c.score, c.path))
     if not ranked:
@@ -213,12 +222,13 @@ def select_template(description: str, references: list[Path]) -> tuple[Path, flo
     return Path(ranked[0].path), ranked[0].score
 
 
-def build_cases(references: list[Path], limit: int | None = None) -> list[EvalCase]:
+def build_cases(references: list[Path], limit: int | None = None, exclude_target_template: bool = False) -> list[EvalCase]:
     cases: list[EvalCase] = []
     selector_refs = collect_references([DEFAULT_REFERENCE_DIR])
     for ref in references[: limit or None]:
         title, description = build_description(ref)
-        selected, selected_score = select_template(description, selector_refs)
+        selector_pool = [p for p in selector_refs if not same_path(p, ref)] if exclude_target_template else selector_refs
+        selected, selected_score = select_template(description, selector_pool)
         cases.append(
             EvalCase(
                 case_id=case_id_for(ref),
@@ -228,13 +238,14 @@ def build_cases(references: list[Path], limit: int | None = None) -> list[EvalCa
                 description=description,
                 selected_template=str(selected),
                 selected_template_score=selected_score,
+                selected_template_is_target=same_path(selected, ref),
             )
         )
     return cases
 
 
 def run_id() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -243,6 +254,7 @@ def write_json(path: Path, data: Any) -> None:
 
 
 def prompt_for_ollama(case: EvalCase) -> str:
+    template_labels = "; ".join(visible_drawio_labels(Path(case.selected_template), limit=900)[:30])
     return f"""You are helping test an SAP Architecture Center draw.io generation skill.
 
 Return JSON only. Do not return XML. Do not use markdown fences.
@@ -252,6 +264,9 @@ Create a concise generation plan for this request:
 
 Use the selected SAP template as the base, not a blank canvas:
 {case.selected_template}
+
+Selected template visible labels:
+{template_labels}
 
 Available local SAP starter-kit assets:
 - extract_icon.py for BTP service icons
@@ -270,6 +285,7 @@ subtitle: one sentence subtitle
 services: array of important SAP or external services
 flow_steps: array of numbered flow step labels
 style_risks: array of visual risks to avoid
+template_replacements: array of objects with "from" and "to" label strings for adapting the selected template. Use exact "from" labels from the selected template visible labels.
 """
 
 
@@ -326,6 +342,97 @@ def make_candidate_from_template(case: EvalCase, candidate_path: Path) -> None:
     shutil.copyfile(case.selected_template, candidate_path)
 
 
+def candidate_label_cells(root: ET.Element) -> list[tuple[ET.Element, str]]:
+    cells: list[tuple[ET.Element, str]] = []
+    for cell in root.iter("mxCell"):
+        raw = cell.get("value")
+        if not raw or cell.get("vertex") != "1":
+            continue
+        label = clean_text(raw)
+        if not label or re.fullmatch(r"[0-9.]+", label):
+            continue
+        if len(label) < 3 or len(label) > 120:
+            continue
+        cells.append((cell, label))
+    return cells
+
+
+def write_tree(path: Path, tree: ET.ElementTree) -> None:
+    tree.write(path, encoding="unicode")
+
+
+def apply_model_plan(candidate_path: Path, model_json: str, target_path: Path | None = None) -> dict[str, Any]:
+    """Apply conservative label changes from the Ollama planning JSON.
+
+    This is not full diagram synthesis. It makes the template-copy candidate
+    reflect the target scenario labels better while preserving SAP geometry,
+    colors, icons, and connector styles from the selected reference.
+    """
+    try:
+        plan = json.loads(model_json)
+    except json.JSONDecodeError as exc:
+        return {"applied": 0, "error": f"invalid model JSON: {exc}"}
+
+    try:
+        tree = ET.parse(candidate_path)
+    except ET.ParseError as exc:
+        return {"applied": 0, "error": f"candidate XML parse error: {exc}"}
+
+    root = tree.getroot()
+    cells = candidate_label_cells(root)
+    applied: list[dict[str, str]] = []
+    rejected: list[dict[str, Any]] = []
+    before_score: float | None = score_pair(target_path, candidate_path) if target_path else None
+    best_score = before_score or 0.0
+
+    replacements: list[tuple[str, str]] = []
+    for item in plan.get("template_replacements", []) if isinstance(plan.get("template_replacements"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        src = clean_text(str(item.get("from", "")))
+        dst = clean_text(str(item.get("to", "")))
+        if src and dst and src != dst and len(dst) <= 120:
+            replacements.append((src, dst))
+
+    for src, dst in replacements:
+        for cell, label in cells:
+            if label == src:
+                previous = cell.get("value") or ""
+                cell.set("value", dst)
+                if target_path:
+                    write_tree(candidate_path, tree)
+                    new_score = score_pair(target_path, candidate_path)
+                    if new_score + 0.05 >= best_score:
+                        applied.append({"from": src, "to": dst, "target_score": f"{new_score:.1f}"})
+                        best_score = new_score
+                    else:
+                        cell.set("value", previous)
+                        write_tree(candidate_path, tree)
+                        rejected.append(
+                            {
+                                "from": src,
+                                "to": dst,
+                                "candidate_score": f"{new_score:.1f}",
+                                "kept_score": f"{best_score:.1f}",
+                            }
+                        )
+                else:
+                    cell.set("value", dst)
+                    applied.append({"from": src, "to": dst})
+                break
+
+    if applied and not target_path:
+        write_tree(candidate_path, tree)
+    return {
+        "applied": len(applied),
+        "rejected": len(rejected),
+        "before_target_score": before_score,
+        "after_target_score": best_score if target_path else None,
+        "changes": applied[:20],
+        "rejected_changes": rejected[:20],
+    }
+
+
 def run_cli(args: list[str], timeout_seconds: int | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, text=True, capture_output=True, timeout=timeout_seconds, check=False)
 
@@ -355,6 +462,18 @@ def score_pair(reference: Path, candidate: Path) -> float:
     return compare(fingerprint(reference), fingerprint(candidate)).score
 
 
+def pass_score_for(pass_mode: str, target_score: float | None, corpus_score: float | None) -> float:
+    target = target_score or 0.0
+    corpus = corpus_score or 0.0
+    if pass_mode == "target":
+        return target
+    if pass_mode == "corpus":
+        return corpus
+    if pass_mode == "both":
+        return min(target, corpus)
+    raise ValueError(f"unknown pass mode {pass_mode!r}")
+
+
 def run_one_attempt(
     case: EvalCase,
     attempt: int,
@@ -363,12 +482,15 @@ def run_one_attempt(
     model: str,
     timeout_seconds: int,
     min_score: float,
+    pass_mode: str,
     corpus_refs: list[Path],
     do_score: bool,
+    apply_model_plan_enabled: bool,
 ) -> AttemptResult:
     attempt_dir = case_dir / f"attempt-{attempt}"
     attempt_dir.mkdir(parents=True, exist_ok=True)
     result = AttemptResult(attempt=attempt)
+    model_json_text: str | None = None
 
     if generator == "ollama":
         try:
@@ -383,6 +505,7 @@ def run_one_attempt(
         if cleaned != raw:
             (attempt_dir / "model-output.clean.txt").write_text(cleaned, encoding="utf-8")
         if model_json:
+            model_json_text = model_json
             result.model_json = str(attempt_dir / "model-output.json")
             (attempt_dir / "model-output.json").write_text(model_json, encoding="utf-8")
         if model_error:
@@ -394,6 +517,9 @@ def run_one_attempt(
 
     candidate = attempt_dir / "candidate.drawio"
     make_candidate_from_template(case, candidate)
+    if generator == "ollama" and apply_model_plan_enabled and model_json_text:
+        apply_result = apply_model_plan(candidate, model_json_text, Path(case.reference) if do_score else None)
+        write_json(attempt_dir / "model-plan-application.json", apply_result)
     result.candidate = str(candidate)
 
     if not do_score:
@@ -410,9 +536,14 @@ def run_one_attempt(
 
     result.target_score = score_pair(Path(case.reference), candidate)
     result.corpus_score, result.best_corpus_reference = best_corpus_score(candidate, corpus_refs)
-    result.passed = result.validate_errors == 0 and result.corpus_score >= min_score
+    result.pass_score = pass_score_for(pass_mode, result.target_score, result.corpus_score)
+    result.passed = result.validate_errors == 0 and result.pass_score >= min_score
     if not result.passed:
-        result.failure = f"validator_errors={result.validate_errors}, corpus_score={result.corpus_score:.1f}"
+        result.failure = (
+            f"validator_errors={result.validate_errors}, pass_mode={pass_mode}, "
+            f"pass_score={result.pass_score:.1f}, target_score={result.target_score:.1f}, "
+            f"corpus_score={result.corpus_score:.1f}"
+        )
     return result
 
 
@@ -442,12 +573,14 @@ def run_cases(
                 model=args.model,
                 timeout_seconds=args.timeout_seconds,
                 min_score=args.min_score,
+                pass_mode=args.pass_mode,
                 corpus_refs=corpus_refs,
                 do_score=do_score,
+                apply_model_plan_enabled=args.apply_model_plan,
             )
             case_result.attempts.append(attempt_result)
-            if attempt_result.corpus_score is not None:
-                case_result.best_score = max(case_result.best_score, attempt_result.corpus_score)
+            if attempt_result.pass_score is not None:
+                case_result.best_score = max(case_result.best_score, attempt_result.pass_score)
             if attempt_result.passed:
                 case_result.passed = True
                 break
@@ -458,24 +591,38 @@ def run_cases(
         if not case_result.passed and not args.continue_on_error:
             break
 
-    write_reports(run_dir, results, args.min_score)
+    write_reports(run_dir, results, args.min_score, args.pass_mode)
     return run_dir, results
 
 
-def write_reports(run_dir: Path, results: list[CaseResult], min_score: float) -> None:
+def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pass_mode: str) -> None:
     passed = sum(1 for r in results if r.passed)
     scores = [r.best_score for r in results if r.best_score]
     best_attempts = {
-        r.case.case_id: max(r.attempts, key=lambda a: a.corpus_score or 0.0) if r.attempts else None
+        r.case.case_id: max(r.attempts, key=lambda a: a.pass_score or 0.0) if r.attempts else None
         for r in results
     }
+    target_scores = [
+        a.target_score
+        for a in best_attempts.values()
+        if a is not None and a.target_score is not None
+    ]
+    corpus_scores = [
+        a.corpus_score
+        for a in best_attempts.values()
+        if a is not None and a.corpus_score is not None
+    ]
     summary = {
         "run_dir": str(run_dir),
         "case_count": len(results),
         "passed": passed,
         "failed": len(results) - passed,
         "min_score": min_score,
+        "pass_mode": pass_mode,
         "average_best_score": round(sum(scores) / len(scores), 1) if scores else 0.0,
+        "average_target_score": round(sum(target_scores) / len(target_scores), 1) if target_scores else 0.0,
+        "average_corpus_score": round(sum(corpus_scores) / len(corpus_scores), 1) if corpus_scores else 0.0,
+        "selected_target_template_count": sum(1 for r in results if r.case.selected_template_is_target),
         "results": [asdict(r) for r in results],
     }
     write_json(run_dir / "summary.json", summary)
@@ -486,19 +633,25 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float) ->
         f"- Cases: {len(results)}",
         f"- Passed: {passed}",
         f"- Failed: {len(results) - passed}",
-        f"- Minimum corpus score: {min_score}",
-        f"- Average best score: {summary['average_best_score']}",
+        f"- Pass mode: {pass_mode}",
+        f"- Minimum pass score: {min_score}",
+        f"- Average pass score: {summary['average_best_score']}",
+        f"- Average target score: {summary['average_target_score']}",
+        f"- Average corpus score: {summary['average_corpus_score']}",
+        f"- Selected target template count: {summary['selected_target_template_count']}",
         "",
-        "| Case | Family | Passed | Best score | Target score | Candidate |",
-        "|---|---|---:|---:|---:|---|",
+        "| Case | Family | Passed | Pass score | Target score | Corpus score | Target template | Candidate |",
+        "|---|---|---:|---:|---:|---:|---:|---|",
     ]
     for r in results:
         best_attempt = best_attempts[r.case.case_id]
         target = best_attempt.target_score if best_attempt and best_attempt.target_score is not None else 0.0
+        corpus = best_attempt.corpus_score if best_attempt and best_attempt.corpus_score is not None else 0.0
         candidate = best_attempt.candidate if best_attempt and best_attempt.candidate else ""
         lines.append(
             f"| `{r.case.case_id}` | {r.case.family} | {str(r.passed).lower()} | "
-            f"{r.best_score:.1f} | {target:.1f} | `{candidate}` |"
+            f"{r.best_score:.1f} | {target:.1f} | {corpus:.1f} | "
+            f"{str(r.case.selected_template_is_target).lower()} | `{candidate}` |"
         )
 
     family_stats: dict[str, dict[str, Any]] = {}
@@ -543,8 +696,8 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float) ->
             "",
             "## Case Details",
             "",
-            "| Case | Reference | Selected template | Validator | Corpus score | Best corpus reference |",
-            "|---|---|---|---:|---:|---|",
+            "| Case | Reference | Selected template | Target template | Validator | Target score | Corpus score | Best corpus reference |",
+            "|---|---|---|---:|---:|---:|---:|---|",
         ]
     )
     for r in results:
@@ -558,8 +711,11 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float) ->
             else ""
         )
         corpus_score = best_attempt.corpus_score if best_attempt and best_attempt.corpus_score is not None else 0.0
+        target_score = best_attempt.target_score if best_attempt and best_attempt.target_score is not None else 0.0
         lines.append(
-            f"| `{r.case.case_id}` | `{reference}` | `{selected}` | {validator} | {corpus_score:.1f} | `{best_ref}` |"
+            f"| `{r.case.case_id}` | `{reference}` | `{selected}` | "
+            f"{str(r.case.selected_template_is_target).lower()} | {validator} | "
+            f"{target_score:.1f} | {corpus_score:.1f} | `{best_ref}` |"
         )
 
     lines.extend(
@@ -603,21 +759,24 @@ def cmd_describe(args: argparse.Namespace) -> int:
 
 def cmd_dry_run(args: argparse.Namespace) -> int:
     refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit)
+    cases = build_cases(refs, args.limit, args.exclude_target_template)
     print(f"dry-run cases: {len(cases)}")
     print(f"generator    : {args.generator}")
+    print(f"pass mode    : {args.pass_mode}")
+    print(f"exclude target template: {str(args.exclude_target_template).lower()}")
+    print(f"apply model plan: {str(args.apply_model_plan).lower()}")
     if args.generator == "ollama":
         print(f"model        : {args.model}")
     for case in cases:
         print(f"- {case.case_id}: {case.title}")
         print(f"  target  : {case.reference}")
-        print(f"  template: {case.selected_template}")
+        print(f"  template: {case.selected_template} (target={str(case.selected_template_is_target).lower()})")
     return 0
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
     refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit)
+    cases = build_cases(refs, args.limit, args.exclude_target_template)
     run_dir, results = run_cases(cases, args, do_score=False)
     print(f"generated {len(results)} case(s) under {run_dir}")
     return 0 if all(r.passed for r in results) else 1
@@ -631,6 +790,8 @@ def cmd_score(args: argparse.Namespace) -> int:
     validate_rc, validate_errors, validate_warnings, _ = validate_candidate(args.candidate)
     corpus_score, best_ref = best_corpus_score(args.candidate, refs)
     target_score = score_pair(args.target, args.candidate) if args.target else None
+    pass_mode = args.pass_mode or ("target" if args.target else "corpus")
+    pass_score = pass_score_for(pass_mode, target_score, corpus_score)
     out = {
         "candidate": str(args.candidate),
         "validate_rc": validate_rc,
@@ -639,7 +800,9 @@ def cmd_score(args: argparse.Namespace) -> int:
         "corpus_score": corpus_score,
         "best_corpus_reference": best_ref,
         "target_score": target_score,
-        "passed": validate_errors == 0 and corpus_score >= args.min_score,
+        "pass_mode": pass_mode,
+        "pass_score": pass_score,
+        "passed": validate_errors == 0 and pass_score >= args.min_score,
     }
     if args.json:
         print(json.dumps(out, indent=2))
@@ -649,6 +812,8 @@ def cmd_score(args: argparse.Namespace) -> int:
         if target_score is not None:
             print(f"target score : {target_score:.1f}")
         print(f"corpus score : {corpus_score:.1f}")
+        print(f"pass mode    : {pass_mode}")
+        print(f"pass score   : {pass_score:.1f}")
         print(f"best ref     : {best_ref}")
         print(f"passed       : {out['passed']}")
     return 0 if out["passed"] else 1
@@ -656,7 +821,7 @@ def cmd_score(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit)
+    cases = build_cases(refs, args.limit, args.exclude_target_template)
     started = time.time()
     run_dir, results = run_cases(cases, args, do_score=True)
     elapsed = time.time() - started
@@ -683,6 +848,9 @@ def add_generation_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--timeout-seconds", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--min-score", type=float, default=90.0)
+    parser.add_argument("--pass-mode", choices=("target", "corpus", "both"), default="target")
+    parser.add_argument("--exclude-target-template", action="store_true")
+    parser.add_argument("--apply-model-plan", action="store_true", help="For Ollama runs, apply conservative label replacements from model JSON")
     parser.add_argument("--continue-on-error", action="store_true")
 
 
@@ -710,6 +878,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("candidate", type=Path)
     p.add_argument("--target", type=Path)
     p.add_argument("--min-score", type=float, default=90.0)
+    p.add_argument("--pass-mode", choices=("target", "corpus", "both"))
     add_common_args(p)
     p.set_defaults(func=cmd_score)
 

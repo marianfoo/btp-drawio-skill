@@ -119,6 +119,7 @@ def default_reference_dir() -> Path:
 
 
 def split_words(text: str) -> list[str]:
+    text = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", text)
     text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
     text = text.replace("_", " ").replace("-", " ").replace("/", " ")
     return [t.lower() for t in re.findall(r"[A-Za-z0-9]+", text)]

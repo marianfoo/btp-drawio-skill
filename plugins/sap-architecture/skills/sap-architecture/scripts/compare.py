@@ -32,6 +32,7 @@ Score is a weighted blend of the dimensions above; 100 = identical fingerprint
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import sys
@@ -53,6 +54,12 @@ PILL_HINT_RE = re.compile(r"arcSize=50[^\"]*strokeWidth=1\b|strokeWidth=1\b[^\"]
 FONT_RE = re.compile(r"fontFamily=([^;\"]+)")
 STROKE_RE = re.compile(r"strokeWidth=([0-9.]+)")
 LINE_RE = re.compile(r"^line", re.I)
+STOPWORDS = {
+    "a", "an", "and", "app", "apps", "architecture", "as", "at", "be", "by",
+    "cloud", "create", "diagram", "for", "from", "in", "into", "is", "l0",
+    "l1", "l2", "of", "on", "or", "page", "ref", "reference", "sap", "show",
+    "solution", "style", "the", "to", "use", "using", "via", "with",
+}
 
 
 # --- Fingerprint ---------------------------------------------------------------
@@ -77,6 +84,44 @@ class Fingerprint:
     fonts: set[str] = field(default_factory=set)
     stroke_widths: set[float] = field(default_factory=set)
     shapes: set[str] = field(default_factory=set)
+    label_count: int = 0
+    label_tokens: set[str] = field(default_factory=set)
+
+
+def split_words(text: str) -> list[str]:
+    text = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", text)
+    text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+    text = text.replace("_", " ").replace("-", " ").replace("/", " ")
+    return [t.lower() for t in re.findall(r"[A-Za-z0-9]+", text)]
+
+
+def clean_label(value: str) -> str:
+    value = html.unescape(value)
+    value = re.sub(r"<br\s*/?>", " ", value, flags=re.I)
+    value = re.sub(r"<[^>]+>", " ", value)
+    value = re.sub(r"&nbsp;", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def tokens(text: str) -> set[str]:
+    out: set[str] = set()
+    words = split_words(text)
+    joined = "".join(words)
+    for word in words:
+        if len(word) >= 2 and word not in STOPWORDS:
+            out.add(word)
+    for compact in ("xsuaa", "privatelink", "workzone", "eventmesh", "multiaz", "multiregion", "businessdatacloud"):
+        if compact in joined:
+            out.add(compact)
+    if "businessdatacloud" in out:
+        out.add("bdc")
+    if "cloudconnector" in joined:
+        out.add("cloudconnector")
+    if "principalpropagation" in joined:
+        out.add("principalpropagation")
+    if "s4hana" in joined or "4hana" in out:
+        out.add("s4hana")
+    return out
 
 
 def fingerprint(path: Path) -> Fingerprint:
@@ -104,6 +149,19 @@ def fingerprint(path: Path) -> Fingerprint:
     cells = root.findall(".//mxCell")
     fp.cells_total = len(cells)
     coords: list[float] = []
+    labels: set[str] = set()
+    for elem in root.iter():
+        for attr in ("name", "label", "value"):
+            raw = elem.get(attr)
+            if not raw:
+                continue
+            label = clean_label(raw)
+            if label:
+                labels.add(label)
+    fp.label_count = len(labels)
+    for label in labels:
+        fp.label_tokens |= tokens(label)
+
     for c in cells:
         if c.get("vertex") == "1":
             fp.vertices += 1
@@ -193,6 +251,15 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
 
     parts["strokes"] = jaccard(ref.stroke_widths, cand.stroke_widths)
     parts["shapes"] = jaccard(ref.shapes, cand.shapes)
+    parts["label_count"] = ratio(ref.label_count, cand.label_count)
+    parts["label_tokens"] = jaccard(ref.label_tokens, cand.label_tokens)
+    missing_label_tokens = ref.label_tokens - cand.label_tokens
+    extra_label_tokens = cand.label_tokens - ref.label_tokens
+    if parts["label_tokens"] < 0.8:
+        r.diffs.append(
+            "label token drift — "
+            f"missing={sorted(missing_label_tokens)[:8]} extra={sorted(extra_label_tokens)[:8]}"
+        )
     extra_shapes = cand.shapes - ref.shapes
     if extra_shapes:
         r.diffs.append(f"shape styles in candidate not in reference: {sorted(extra_shapes)[:8]}")
@@ -224,6 +291,8 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
         "fonts": 1.0,
         "strokes": 0.5,
         "shapes": 1.0,
+        "label_count": 0.5,
+        "label_tokens": 2.0,
         "abs_arc": 0.5,
         "label_bg": 0.5,
         "grid_snap": 1.0,
@@ -263,7 +332,7 @@ def main() -> int:
         }
         # sets aren't JSON-serializable; coerce
         for fp_dict in (out["reference"], out["candidate"]):
-            for k in ("palette", "fonts", "stroke_widths", "shapes"):
+            for k in ("palette", "fonts", "stroke_widths", "shapes", "label_tokens"):
                 fp_dict[k] = sorted(fp_dict[k])
         print(json.dumps(out, indent=2))
         return 0
