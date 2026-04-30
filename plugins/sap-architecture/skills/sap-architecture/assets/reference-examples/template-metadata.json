@@ -384,8 +384,33 @@
       "family": "ra0029",
       "level": "l2",
       "domain": "agentic-ai",
-      "aliases": ["Agentic AI", "Agentic AI on SAP BTP", "Agentic AI & AI Agents", "agentic AI root", "AI agents architecture", "SAP Joule User Interface", "Joule Orchestrator", "Joule Capabilities", "Agent Gateway"],
-      "tags": ["agentic", "ai", "agent", "agents", "joule", "tools", "mcp", "gateway", "orchestrator", "capabilities", "subaccount", "cloud-solutions", "s4hana", "successfactors", "businessdatacloud", "concur", "business-networks", "customer-experience", "identity"]
+      "primary": true,
+      "aliases": [
+        "Agentic AI",
+        "Agentic AI on BTP",
+        "Agentic AI on SAP BTP",
+        "Agentic AI & AI Agents",
+        "agentic AI root",
+        "AI agents architecture",
+        "AI Agents and Agent Builder",
+        "Joule and Agent Gateway",
+        "BTP Joule subaccount agents",
+        "Agentic AI overview",
+        "SAP Joule User Interface",
+        "Joule Orchestrator",
+        "Joule Capabilities",
+        "Agent Gateway"
+      ],
+      "tags": [
+        "agentic", "ai", "agent", "agents", "joule", "tools",
+        "agent-gateway", "joule-orchestrator", "joule-capabilities",
+        "joule-skills", "joule-user-interface", "custom-agents",
+        "mcp", "mcp-gateway", "gateway", "agent-registry", "ord",
+        "subaccount", "cloud-solutions", "third-party",
+        "s4hana", "successfactors", "businessdatacloud", "concur",
+        "business-networks", "customer-experience", "identity",
+        "orchestrator", "capabilities"
+      ]
     },
     "ac_RA0029_EmbodiedAIAgents.drawio": {
       "title": "Embodied AI agents with SAP BTP",

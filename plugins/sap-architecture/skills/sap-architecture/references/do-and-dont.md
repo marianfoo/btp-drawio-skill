@@ -89,6 +89,9 @@ This skill always emits draw.io.
 `validate.py` catches:
 
 - Off-palette hex (warns)
+- **Dark / branded page background** (`pageBackgroundColor` not in {white, transparent}) — error
+- **Off-vocabulary pill verbs** — pills labelled `PROMPT`, `ROUTE`, `CONTEXT`, `DELEGATE`, `INVOKE`, `FETCH`, `EXECUTE`, etc. trigger warnings. Use canonical SAP verbs: `TRUST`, `Authenticate`, `Authorization`, `A2A`, `MCP`, `ORD`, `HTTPS`, `OData/REST`, `REST/Token`, `SAML2/OIDC`, `OIDC`, `SCIM`, `Identity Lifecycle`, `Group`, `Role`, `Role Collection`, `Source`, `Target`, `Destination`.
+- **Multi-logo over-use** — more than 6 SAP logos in one diagram triggers a warning per `product_names.md`.
 - `absoluteArcSize=1` missing when `arcSize` is set (warns; autofix repairs)
 - `strokeWidth` outside `{1, 1.5, 2, 3, 4}` (warns)
 - `strokeWidth>=3` flagged for review (firewall-only rule)
@@ -100,10 +103,16 @@ This skill always emits draw.io.
 - `fontFamily` ≠ Helvetica — warns; autofix repairs
 - Duplicate ids, missing `mxGeometry`, XML comments — error
 
+`compare.py` additionally penalises:
+
+- Wrong page background (white SAP canvas vs candidate dark theme)
+- Wrong zone *hierarchy* — e.g. nesting Joule inside the BTP zone when the SAP reference puts them side by side
+- Wrong edge stroke palette — semantic mismatches (green where magenta is expected) that the global palette set hides
+- Pills using novelty verbs instead of the canonical SAP vocabulary
+
 What `validate.py` does **not** check (yet — manual review):
 
 - "Use the grey-circle icon variant" — visual check, not extractable from XML
-- "One SAP logo per diagram" — countable but currently not enforced
 - "Don't use accent colors heavily" — proportional rule, hard to quantify
 - "Spacing roughly = SAP logo height" — context-dependent
 - "Legend present" — checked only via warning if `level=L1|L2` and no `legend` element exists

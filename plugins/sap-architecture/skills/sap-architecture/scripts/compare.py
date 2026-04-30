@@ -42,6 +42,8 @@ from pathlib import Path
 
 HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
 DATA_URI_RE = re.compile(r"data:image/[^&\";]+")
+INLINE_SVG_ICON_RE = re.compile(r"shape=image[^\"]*image=data:image/svg")
+STENCIL_ICON_RE = re.compile(r"shape=mxgraph\.sap\.icon")
 ICON_RE = re.compile(r"shape=image[^\"]*image=data:image/svg|shape=mxgraph\.sap\.icon")
 EXTERNAL_IMAGE_RE = re.compile(r"shape=image[^\"]*image=https?://|image=https?://")
 SHAPE_RE = re.compile(r"(?:^|;)shape=([^;\"]+)")
@@ -54,6 +56,22 @@ PILL_HINT_RE = re.compile(r"arcSize=50[^\"]*strokeWidth=1\b|strokeWidth=1\b[^\"]
 FONT_RE = re.compile(r"fontFamily=([^;\"]+)")
 STROKE_RE = re.compile(r"strokeWidth=([0-9.]+)")
 LINE_RE = re.compile(r"^line", re.I)
+PAGE_BG_RE = re.compile(r'(?:background|pageBackgroundColor)="([^"]+)"')
+
+# Canonical SAP flow-pill vocabulary, kept in sync with validate.py.
+CANONICAL_PILL_VOCAB = {
+    "trust", "authenticate", "authentication", "authorization",
+    "identity", "identity lifecycle", "customer-managed identity lifecycle",
+    "user", "usergroup", "group", "role", "role collection", "role collections",
+    "policy", "scim", "saml2/oidc", "oidc", "saml", "openid",
+    "https", "https/active", "https/standby", "rest", "rest/spi",
+    "rest/token", "rest / odata", "odata/rest", "odata/rest/soap",
+    "destination", "source", "target", "harmonized api",
+    "data federation", "data sync", "task data",
+    "a2a", "mcp", "ord",
+    "business data cloud", "business role", "cdm",
+    "role replica", "data", "metadata",
+}
 STOPWORDS = {
     "a", "an", "and", "app", "apps", "architecture", "as", "at", "be", "by",
     "cloud", "create", "diagram", "for", "from", "in", "into", "is", "l0",
@@ -80,17 +98,26 @@ class Fingerprint:
     edges: int = 0
     zones: int = 0
     icons: int = 0
+    icons_inline: int = 0       # bundled inline-SVG icons (preferred)
+    icons_stencil: int = 0      # mxgraph.sap.icon stencil legacy
     external_images: int = 0
     pills: int = 0
     grid_snap_rate: float = 0.0
     has_absolute_arc: bool = False
     has_label_bg: bool = False
     palette: set[str] = field(default_factory=set)
+    edge_palette: set[str] = field(default_factory=set)  # strokeColors used on edges
     fonts: set[str] = field(default_factory=set)
     stroke_widths: set[float] = field(default_factory=set)
     shapes: set[str] = field(default_factory=set)
     label_count: int = 0
     label_tokens: set[str] = field(default_factory=set)
+    pill_vocab: set[str] = field(default_factory=set)
+    canonical_pill_count: int = 0
+    novelty_pill_count: int = 0
+    page_background: str = ""
+    zone_depth: int = 0          # max nested zone depth observed
+    sap_logo_count: int = 0
 
 
 def split_words(text: str) -> list[str]:
@@ -130,6 +157,19 @@ def tokens(text: str) -> set[str]:
     return out
 
 
+def parse_style_dict(style: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not style:
+        return out
+    for part in style.split(";"):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        k, v = part.split("=", 1)
+        out[k.strip()] = v.strip()
+    return out
+
+
 def fingerprint(path: Path) -> Fingerprint:
     fp = Fingerprint(path=str(path))
     text = path.read_text(encoding="utf-8")
@@ -139,18 +179,23 @@ def fingerprint(path: Path) -> Fingerprint:
     fp.stroke_widths = {float(s) for s in STROKE_RE.findall(palette_text)}
     fp.has_absolute_arc = bool(ABS_ARC_RE.search(text))
     fp.has_label_bg = bool(LABEL_BG_RE.search(text))
+    bg_match = PAGE_BG_RE.search(palette_text)
+    if bg_match:
+        fp.page_background = bg_match.group(1).strip().lower()
 
     try:
         root = ET.parse(path).getroot()
     except ET.ParseError:
         return fp
 
-    diagram = root.find(".//diagram")
-    mxfile = root.find(".//mxGraphModel") if root.tag != "mxfile" else None
     graph = root.find(".//mxGraphModel")
     if graph is not None:
         fp.canvas_w = int(graph.get("pageWidth") or graph.get("dx") or 0)
         fp.canvas_h = int(graph.get("pageHeight") or graph.get("dy") or 0)
+        if not fp.page_background:
+            bg = (graph.get("background") or graph.get("pageBackgroundColor") or "").strip().lower()
+            if bg:
+                fp.page_background = bg
 
     cells = root.findall(".//mxCell")
     fp.cells_total = len(cells)
@@ -168,21 +213,68 @@ def fingerprint(path: Path) -> Fingerprint:
     for label in labels:
         fp.label_tokens |= tokens(label)
 
+    # Map cell id → cell so we can compute parent-zone nesting depth.
+    cells_by_id: dict[str, ET.Element] = {}
+    for c in cells:
+        cid = c.get("id")
+        if cid:
+            cells_by_id[cid] = c
+
+    parent_by_elem = {id(child): parent for parent in root.iter() for child in list(parent)}
+
+    def is_zone_cell(c: ET.Element) -> bool:
+        style_text = c.get("style") or ""
+        if not ARC16_RE.search(style_text):
+            return False
+        if "strokeWidth=1.5" not in style_text:
+            return False
+        # SAP zone styling encodes bold via inline HTML in `value`, not fontStyle.
+        # So we accept zone cells with arcSize=16 + strokeWidth=1.5 even without
+        # fontStyle=1 — a critical fix for accurate zone counting.
+        return True
+
+    zone_ids: set[str] = set()
     for c in cells:
         if c.get("vertex") == "1":
             fp.vertices += 1
             style = c.get("style") or ""
-            if ICON_RE.search(style):
+            sd = parse_style_dict(style)
+            inline_icon = bool(INLINE_SVG_ICON_RE.search(style))
+            stencil_icon = bool(STENCIL_ICON_RE.search(style))
+            if inline_icon:
                 fp.icons += 1
+                fp.icons_inline += 1
+            elif stencil_icon:
+                fp.icons += 1
+                fp.icons_stencil += 1
             if EXTERNAL_IMAGE_RE.search(style):
                 fp.external_images += 1
+            image = sd.get("image", "")
+            if image and "sap_logo" in image.lower():
+                fp.sap_logo_count += 1
             for shape in SHAPE_RE.findall(style):
                 if shape != "image":
                     fp.shapes.add(shape)
             if ARC50_RE.search(style):
                 fp.pills += 1
-            elif ARC16_RE.search(style) and "strokeWidth=1.5" in style and "fontStyle=1" in style:
+                # capture pill label vocabulary
+                raw_label = c.get("value") or ""
+                if not raw_label:
+                    parent = parent_by_elem.get(id(c))
+                    if parent is not None and parent.tag == "UserObject":
+                        raw_label = parent.get("value") or parent.get("label") or ""
+                pill_label = clean_label(raw_label).strip().lower()
+                if pill_label:
+                    fp.pill_vocab.add(pill_label)
+                    if pill_label in CANONICAL_PILL_VOCAB:
+                        fp.canonical_pill_count += 1
+                    else:
+                        fp.novelty_pill_count += 1
+            elif is_zone_cell(c):
                 fp.zones += 1
+                cid = c.get("id")
+                if cid:
+                    zone_ids.add(cid)
             geo = c.find("mxGeometry")
             if geo is not None:
                 for attr in ("x", "y", "width", "height"):
@@ -194,6 +286,37 @@ def fingerprint(path: Path) -> Fingerprint:
                             pass
         elif c.get("edge") == "1":
             fp.edges += 1
+            style = c.get("style") or ""
+            sd = parse_style_dict(style)
+            stroke = sd.get("strokeColor", "").upper()
+            if stroke and stroke.startswith("#"):
+                fp.edge_palette.add(stroke)
+
+    # Zone nesting depth: count how many zone cells appear in the parent chain.
+    def zone_depth_for(c: ET.Element) -> int:
+        depth = 0
+        parent_id = c.get("parent")
+        seen = set()
+        while parent_id and parent_id not in seen:
+            seen.add(parent_id)
+            parent_cell = cells_by_id.get(parent_id)
+            if parent_cell is None:
+                break
+            if parent_cell.get("id") in zone_ids:
+                depth += 1
+            parent_id = parent_cell.get("parent")
+        return depth
+
+    if zone_ids:
+        max_depth = 0
+        for c in cells:
+            if c.get("vertex") != "1":
+                continue
+            d = zone_depth_for(c)
+            if d > max_depth:
+                max_depth = d
+        fp.zone_depth = max_depth
+
     if coords:
         snapped = sum(1 for v in coords if abs(v - round(v)) < 1e-6 and round(v) % 10 == 0)
         fp.grid_snap_rate = snapped / len(coords)
@@ -224,6 +347,21 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
     if not parts["canvas"]:
         r.diffs.append(f"canvas mismatch — ref {ref.canvas_w}x{ref.canvas_h} vs cand {cand.canvas_w}x{cand.canvas_h}")
 
+    # Page background fidelity. SAP diagrams use white/transparent canvas;
+    # any explicit non-white background is a major red flag.
+    accepted_bgs = {"", "none", "default", "#ffffff", "#fff"}
+    cand_bg = cand.page_background.lower()
+    ref_bg = ref.page_background.lower()
+    if cand_bg in accepted_bgs:
+        parts["page_bg"] = 1.0
+    elif cand_bg == ref_bg:
+        parts["page_bg"] = 1.0
+    else:
+        parts["page_bg"] = 0.0
+        r.diffs.append(
+            f"non-white page background {cand.page_background!r} — SAP uses white/transparent canvas"
+        )
+
     def ratio(a: float, b: float) -> float:
         if a == 0 and b == 0:
             return 1.0
@@ -231,15 +369,52 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
             return 0.0
         return min(a, b) / max(a, b)
 
-    # zones: detection is unreliable across SAP files — many style strings don't
-    # match our heuristic — drop from scoring unless reference has at least one
+    # zones: zone detection now uses arcSize=16 + strokeWidth=1.5 (no fontStyle
+    # requirement) — matches SAP's actual encoding where bold is HTML-inline.
     if ref.zones > 0 or cand.zones > 0:
         parts["zones"] = ratio(ref.zones, cand.zones)
+
+    # zone nesting depth — matters for templates like Joule-inside-vs-beside-BTP
+    if ref.zone_depth > 0 or cand.zone_depth > 0:
+        parts["zone_depth"] = ratio(ref.zone_depth, cand.zone_depth)
+        if ref.zone_depth != cand.zone_depth:
+            r.diffs.append(
+                f"zone nesting depth differs — ref {ref.zone_depth} vs cand {cand.zone_depth}"
+            )
+
+    # icons: prefer inline-SVG over legacy mxgraph.sap.icon stencils. SAP's own
+    # corpus uses both, so we don't penalize stencils outright; we just count
+    # inline + stencil together to match SAP's behavior.
     parts["icons"] = ratio(ref.icons, cand.icons)
     parts["external_images"] = 1.0 if cand.external_images <= ref.external_images else ratio(ref.external_images, cand.external_images)
     parts["edges"] = ratio(ref.edges, cand.edges)
     parts["vertices"] = ratio(ref.vertices, cand.vertices)
     parts["pills"] = ratio(ref.pills, cand.pills) if (ref.pills or cand.pills) else 1.0
+
+    # Pill vocabulary fidelity. Reward use of SAP-canonical pill labels;
+    # penalize candidates whose pills are mostly novelty verbs.
+    if ref.pills > 0 or cand.pills > 0:
+        ref_canon_rate = ref.canonical_pill_count / max(1, ref.pills)
+        cand_canon_rate = cand.canonical_pill_count / max(1, cand.pills)
+        if ref.pills == 0:
+            parts["pill_vocab"] = 1.0 if cand_canon_rate >= 0.6 else cand_canon_rate
+        else:
+            # Match the reference's canon rate within tolerance, full credit if cand >= ref
+            target = max(ref_canon_rate, 0.5)
+            parts["pill_vocab"] = 1.0 if cand_canon_rate >= target else (cand_canon_rate / max(0.01, target))
+        if cand.novelty_pill_count > 0 and cand.novelty_pill_count > ref.novelty_pill_count:
+            r.diffs.append(
+                f"novelty pill labels: {cand.novelty_pill_count} (cand) vs {ref.novelty_pill_count} (ref) "
+                "— prefer canonical SAP verbs (TRUST/Authenticate/A2A/MCP/ORD/...)"
+            )
+
+    # Edge palette: which colors are actually used on edges? This catches
+    # green↔magenta semantic swaps that the global palette set hides.
+    if ref.edge_palette or cand.edge_palette:
+        parts["edge_palette"] = jaccard(ref.edge_palette, cand.edge_palette)
+        edge_diff = ref.edge_palette - cand.edge_palette
+        if edge_diff:
+            r.diffs.append(f"edge stroke colors missing from candidate: {sorted(edge_diff)[:6]}")
 
     parts["palette"] = jaccard(ref.palette, cand.palette)
     only_in_cand = cand.palette - ref.palette
@@ -287,13 +462,17 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
 
     weights = {
         "canvas": 1.0,
+        "page_bg": 1.5,            # NEW: dark/branded canvas now penalized
         "zones": 1.5,
+        "zone_depth": 1.0,         # NEW: nesting hierarchy match (Joule-in-BTP bug)
         "icons": 1.5,
         "external_images": 0.5,
         "edges": 1.0,
         "vertices": 0.5,
         "pills": 0.5,
+        "pill_vocab": 1.5,         # NEW: canonical SAP pill verbs vs novelty
         "palette": 1.5,
+        "edge_palette": 1.0,       # NEW: connector colors actually used on edges
         "fonts": 1.0,
         "strokes": 0.5,
         "shapes": 1.0,
@@ -338,7 +517,7 @@ def main() -> int:
         }
         # sets aren't JSON-serializable; coerce
         for fp_dict in (out["reference"], out["candidate"]):
-            for k in ("palette", "fonts", "stroke_widths", "shapes", "label_tokens"):
+            for k in ("palette", "edge_palette", "fonts", "stroke_widths", "shapes", "label_tokens", "pill_vocab"):
                 fp_dict[k] = sorted(fp_dict[k])
         print(json.dumps(out, indent=2))
         return 0

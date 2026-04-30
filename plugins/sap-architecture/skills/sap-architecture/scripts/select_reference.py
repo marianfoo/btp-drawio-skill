@@ -395,9 +395,41 @@ def score(path: Path, query: str) -> Candidate:
         value -= 10
         reasons.append("strong scenario mismatch penalty (-10)")
 
+    # MCP/A2A bonus: only fire when the query is *specifically* about agent-to-
+    # agent or MCP integration (not when it merely mentions an MCP gateway as
+    # one of many components in a broader Agentic AI scenario). The previous
+    # rule unconditionally awarded +20 to A2A_MCP whenever "mcp" appeared,
+    # incorrectly outranking AgenticAI_root for the canonical RA0029 prompt.
     if q_tokens & {"mcp", "a2a"} and filename_tokens & {"mcp", "a2a"}:
-        value += 20
-        reasons.append("exact MCP/A2A filename match (+20)")
+        # Strong agentic-AI / Joule signals indicate the user wants the
+        # umbrella RA0029 root template, not the A2A/MCP sub-scenario.
+        broader_agentic_signal = bool(
+            q_tokens & {"agentic"}
+            and (q_tokens & {"joule"} or len(q_tokens & {"agent", "agents", "ai"}) >= 2)
+        )
+        if not broader_agentic_signal:
+            value += 20
+            reasons.append("exact MCP/A2A filename match (+20)")
+        else:
+            value += 6
+            reasons.append("MCP/A2A filename match dampened (broader agentic-AI scenario) (+6)")
+
+    # Primary-template preference within a family: when the user query maps
+    # to a well-known family (e.g. agentic-ai) without a specific sub-scenario
+    # signal (no explicit "embodied", "procode", "joule studio", etc.), prefer
+    # the metadata-flagged "primary" template. This correctly routes the
+    # canonical "Agentic AI on SAP BTP" prompt to AgenticAI_root.
+    if metadata.get("primary"):
+        sub_signals = {
+            "embodied", "robotics",  # → EmbodiedAIAgents
+            "procode", "developer", "code", "vscode", "ide",  # → GenAI_ProCode
+            "studio",  # → Joule_Studio variants
+            "ecosystem",  # → JouleAgentsToolsEcosystem
+        }
+        # If query has no specific sub-scenario signal, give the primary template a meaningful boost
+        if not (q_tokens & sub_signals):
+            value += 14
+            reasons.append("metadata primary-template boost (+14)")
     if q_tokens & {"xsuaa", "oauth", "oidc", "saml"} and (
         {"authentication", "authn"} & filename_tokens or "cloud" in filename_lower and "identity" in filename_lower
     ):

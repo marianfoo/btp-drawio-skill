@@ -9,8 +9,12 @@ A claim like "this plugin produces SAP-Architecture-Center-style diagrams" is on
 | Dimension | What's checked |
 |-----------|----------------|
 | **Canvas** | `pageWidth × pageHeight` — should match the selected SAP template; `1169 × 827` is the default for new L2 diagrams |
-| **Counts** | total cells, vertices, edges, icons (cells with SAP-icon SVG data URI), pills (cells with `arcSize=50`) |
+| **Page background** | `pageBackgroundColor` / `background` attribute — SAP diagrams use white/transparent. A non-white candidate scores 0 on this metric. |
+| **Counts** | total cells, vertices, edges, inline-SVG icons, legacy `mxgraph.sap.icon` stencil count, pills (`arcSize=50`) |
+| **Zone hierarchy** | nesting depth of zone cells — catches structural mistakes like nesting a focus zone inside another one when the SAP reference puts them side by side (Joule-inside-BTP bug) |
 | **Palette** | the set of hex colors in the file (Jaccard similarity) |
+| **Edge palette** | the set of `strokeColor` values *actually used on edges* — catches semantic color swaps (green↔magenta) that the global palette set hides |
+| **Pill vocabulary** | how many pills use canonical SAP verbs (TRUST/Authenticate/A2A/MCP/ORD/HTTPS/OData/REST/SAML2/OIDC/...) vs novelty verbs (PROMPT/ROUTE/CONTEXT/...) |
 | **Fonts** | `fontFamily` values used (subset = full credit) |
 | **Stroke widths** | the set of `strokeWidth` values |
 | **Polish** | presence of `absoluteArcSize=1`, `labelBackgroundColor=default`, grid-snap rate |
@@ -43,16 +47,19 @@ description ┐
             │
             ▼
 ┌──────────────────────────────────────────────────────────┐
-│ Step 1 — pick the closest reference template             │
-│   select_reference.py ranks 63 bundled SAP templates     │
-│   using metadata aliases/tags + visible draw.io labels   │
+│ Step 1 — scaffold from a SAP reference template          │
+│   scaffold_diagram.py "<request>" --out <file>.drawio    │
+│   Ranks 63 bundled SAP templates and copies the best one │
+│   (uses metadata aliases/tags + visible draw.io labels   │
+│   + the "primary": true flag for canonical umbrella refs)│
 └──────────────────────────────────────────────────────────┘
             │
             ▼
 ┌──────────────────────────────────────────────────────────┐
-│ Step 2 — copy + relabel for the new scenario             │
+│ Step 2 — surgical relabel for the new scenario           │
 │   Title, zone labels, service-card values; preserve      │
-│   geometry, edges, pills, legend                         │
+│   canvas size, zone hierarchy, edges, pills, legend,     │
+│   network divider, SAP logos, footer                     │
 └──────────────────────────────────────────────────────────┘
             │
             ▼
@@ -65,8 +72,10 @@ description ┐
 ┌──────────────────────────────────────────────────────────┐
 │ Step 4 — validate.py                                     │
 │   Errors: bent arrows, label overflow, sibling overlap,  │
-│   missing geometry, duplicate ids                        │
-│   Warnings: off-palette, off-grid, missing label-bg      │
+│   missing geometry, duplicate ids,                       │
+│   dark/branded page background                           │
+│   Warnings: off-palette, off-grid, missing label-bg,     │
+│   off-vocabulary pill verbs, multi-logo over-use         │
 └──────────────────────────────────────────────────────────┘
             │
             ▼
@@ -74,6 +83,7 @@ description ┐
 │ Step 5 — score_corpus.py across all bundled references   │
 │   Best score should be ≥ 90 if template drift is low     │
 │   If < 90, compare.py shows where the structure drifted  │
+│   (canvas, page bg, zone depth, edge palette, pill vocab)│
 └──────────────────────────────────────────────────────────┘
             │
             ▼
@@ -116,6 +126,9 @@ Without these gates, a hand-crafted candidate scored **~52** even when it follow
 - Sparse zones with too few service cards (low vertex / icon count)
 - Off-palette hex from improvising "close-enough" colors
 - Missing `labelBackgroundColor=default` on edge labels
+- **Dark / branded page background** (now a hard validator error)
+- **Off-vocabulary pill verbs** like `PROMPT`, `ROUTE`, `CONTEXT`, `DELEGATE` — replaced with `TRUST`, `Authenticate`, `A2A`, `MCP`, `ORD`, `HTTPS`, `OData/REST`, `SAML2/OIDC`
+- **Wrong zone hierarchy** (e.g. nesting Joule inside the BTP zone when SAP places it as a sibling) — now penalised by the `zone_depth` metric in `compare.py`
 
 `validate.py` catches all of these before the diagram is shown to the user. `autofix.py` repairs the mechanical ones automatically.
 

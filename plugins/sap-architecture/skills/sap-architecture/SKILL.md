@@ -7,6 +7,24 @@ description: Use this skill WHENEVER the user wants to create, generate, draw, d
 
 Take a natural-language description of an SAP / BTP / on-prem landscape and produce a polished draw.io file in the SAP Architecture Center visual style. Every artifact it emits is validated against the same rules SAP follows in the published reference architectures.
 
+## STOP — read this before generating any XML
+
+This skill ALWAYS starts from a pristine SAP reference template. The single most common failure mode is the LLM trying to write a `.drawio` file from scratch and ending up with: dark page background, custom flow verbs (PROMPT/ROUTE/CONTEXT/DELEGATE), wrong zone hierarchy (e.g. Joule nested inside BTP instead of beside it), missing SAP footer/logo branding, off-vocabulary connector colors. None of those mistakes are recoverable by autofix — they are baked into the structure.
+
+The mandatory first action — before any other tool call — is:
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/scaffold_diagram.py \
+  "<the user's full request, verbatim>" \
+  --out <destination.drawio>
+```
+
+That script ranks the 63 bundled SAP templates against the request, copies the best match to the destination, and prints the alternatives. Now you have a SAP-anchored starting point. From here you make surgical label changes only — never `cat <<EOF > foo.drawio`, never write XML from scratch.
+
+If the user asks "use the X template", pass `--template ac_X.drawio` to the scaffold instead. If you genuinely need to inspect candidates first without copying, pass `--dry-run`.
+
+The validate.py / compare.py gates will reject from-scratch generations: dark `pageBackgroundColor` is now an error, novelty pill verbs are warnings, missing zones lower the score against the chosen reference.
+
 ## When to use
 
 Trigger on any of:
@@ -29,30 +47,33 @@ Follow this sequence exactly — each step produces input for the next, and each
 Before touching XML, write out (in your head or as a hidden scratch pad):
 
 1. **Level** — pick L0 / L1 / L2. Default is **L2**. See `references/levels.md` for signals. SAP's published BTP guideline defines these three levels; do not invent L3 unless the user explicitly asks for a non-SAP internal physical diagram.
-2. **Zones** — list the landscape columns needed, typically 2–4 of: `User / MCP Client`, `SAP BTP`, `On-Premise`, `Third-party / Hyperscaler`.
+2. **Zones** — list the landscape columns needed, typically 2–4 of: `User / MCP Client`, `SAP BTP`, `On-Premise`, `Third-party / Hyperscaler`. Some scenarios (Agentic AI) put `Joule` as its own top-level zone beside BTP, not nested inside.
 3. **Services** — for each zone list the concrete cards (service name, role, vendor). Flag which BTP services need the official icon from the bundled library.
-4. **Flow** — number the steps 1..N. Pick a pill color per step from the semantic palette (auth=green, trust=magenta, MCP=teal, authz=indigo).
+4. **Flow** — number the steps 1..N. Pick a pill color per step from the semantic palette (auth=green, trust=magenta, MCP=teal, authz=indigo). Use only canonical pill verbs: TRUST, Authenticate, Authorization, A2A, MCP, ORD, HTTPS, OData/REST, SAML2/OIDC, Identity Lifecycle, etc.
 5. **Accent / focus app** — the "star" of the diagram (ARC-1, Joule, user's own app). Uses the purple accent.
 
-Keep this plan short — a 10-line bullet list is plenty. Don't skip it: diagrams built without a plan drift off-grid and end up with bent arrows.
+Keep this plan short — a 10-line bullet list is plenty. Don't skip it: diagrams built without a plan drift off-grid and end up with bent arrows. The plan is what you feed into `scaffold_diagram.py` in step 2.
 
-### 2. Pick a reference template with the selector
+### 2. Scaffold from a SAP reference template — MANDATORY
 
-Run the selector before choosing a template:
+This step is non-negotiable. Run scaffold_diagram.py — it both ranks templates and copies the best one to the destination:
 
 ```bash
-python3 .claude/skills/sap-architecture/scripts/select_reference.py --top 5 \
-  "paste the user's diagram request here"
+python3 .claude/skills/sap-architecture/scripts/scaffold_diagram.py \
+  "<the user's full diagram request>" \
+  --out <destination.drawio>
 ```
 
-Copy the closest bundled `.drawio` from `assets/reference-examples/` into the target location. **63 reference templates** are bundled, all Apache-2.0, sourced verbatim from `SAP/btp-solution-diagrams` (prefix `btp_`) and `SAP/architecture-center` (prefix `ac_`).
+If you only want to inspect candidates first, add `--dry-run` (no file is created). To pin a specific template, use `--template <filename>`. To rename the `<diagram name>` attribute after copy, pass `--diagram-name "Agentic AI on BTP"`.
 
-Reference families now cover: Task Center, Build Work Zone, Build Process Automation, Cloud Identity Services / IAM, Private Link, Event-Driven Architecture, E2B connectivity, multi-region resiliency, Federated ML, hyperscaler data integration, Generative AI / RAG, A2A / MCP, Edge Integration Cell, Business Data Cloud, OData via App Router / CAP, B2B / A2A / API-managed integration, DevOps, Joule, SIEM/SOAR, SuccessFactors integration, and Agentic AI. The selector also reads `assets/reference-examples/template-metadata.json`, which gives every bundled template a curated title, domain, level, aliases, and scenario tags; trust those rankings over raw visible labels such as `Page-1`.
+**63 reference templates** are bundled, all Apache-2.0, sourced verbatim from `SAP/btp-solution-diagrams` (prefix `btp_`) and `SAP/architecture-center` (prefix `ac_`). Reference families: Task Center, Build Work Zone, Build Process Automation, Cloud Identity Services / IAM, Private Link, Event-Driven Architecture, E2B connectivity, multi-region resiliency, Federated ML, hyperscaler data integration, Generative AI / RAG, A2A / MCP, Edge Integration Cell, Business Data Cloud, OData via App Router / CAP, B2B / A2A / API-managed integration, DevOps, Joule, SIEM/SOAR, SuccessFactors integration, and Agentic AI.
 
-**Selection guidance:**
+The selector reads `assets/reference-examples/template-metadata.json`, which gives every bundled template a curated title, domain, level, aliases, and scenario tags. Templates marked `"primary": true` win for canonical family prompts (e.g. `ac_RA0029_AgenticAI_root.drawio` for "Agentic AI on SAP BTP"). Trust those rankings over raw visible labels such as `Page-1`.
+
+**Selection guidance once you've reviewed candidates:**
 
 1. Pick the level first (L0/L1/L2) — `levels.md`.
-2. Pick the closest **scenario family**: identity → IAS / IAM templates; data flow → Task Center / Build Work Zone; networking → Private Link / OData PrivateLink; AI → RA0029 family; multitenancy → SuSaaS.
+2. Pick the closest **scenario family**: identity → IAS / IAM templates; data flow → Task Center / Build Work Zone; networking → Private Link / OData PrivateLink; AI umbrella → `ac_RA0029_AgenticAI_root.drawio`; pure A2A/MCP → `ac_RA0029_A2A_MCP.drawio`; embodied/robotic → `ac_RA0029_EmbodiedAIAgents.drawio`; multitenancy → SuSaaS.
 3. If two templates are close, prefer the simpler one. Don't try to inherit the busiest available diagram.
 
 Known anchor templates:
@@ -61,11 +82,11 @@ Known anchor templates:
 - Focused **A2A / MCP** flow → `ac_RA0029_A2A_MCP.drawio`.
 - **Joule tool ecosystem** overview → `ac_RA0029_JouleAgentsToolsEcosystem.drawio`.
 
-Preserve the title band, zone containers, legend (if any), SAP logo, Architecture Center footer / QR / reference id (if any), and the selected template's canvas size. For new diagrams without a clear source template, use `1169 × 827`. Rename `<diagram name="…">` to your subject. Prefer surgical relabeling over deletion. If cards or edges must change, duplicate existing template cells and keep similar zone density, icon count, pill count, and connector rhythm.
+After scaffold has copied a template, **preserve all of it** — title band, zone containers, legend (if any), SAP logos, network divider, Architecture Center footer / QR / reference id (if any), identity flow placement, and the selected template's canvas size. For new diagrams without a clear source template, use `1169 × 827`. Rename `<diagram name="…">` to your subject. Prefer surgical relabeling over deletion. If cards or edges must change, duplicate existing template cells and keep similar zone density, icon count, pill count, and connector rhythm. The fastest way to a good diagram is renaming labels, swapping icons in-place, and adding a few cards next to the existing ones; the slowest way is rewriting the file.
 
 For Architecture Center templates such as `ac_RA0029_AgenticAI_root.drawio`, do **not** replace the white canvas, footer, network divider, or SAP-branded area structure with a dark dashboard layout. If the user asks for a "legend" but the chosen template has no separate bottom legend, satisfy that by preserving the existing inline pills/labels and printing the flow narration after the diagram.
 
-**Do not draw from scratch.** Starting from a pristine template is the single highest-fidelity trick in this skill.
+**Do not draw from scratch.** Starting from a pristine template is the single highest-fidelity trick in this skill. Building a `.drawio` directly with Write/Edit (without scaffold_diagram.py first) is the most common cause of validator errors, dark backgrounds, novelty pill verbs, and bent edges.
 
 ### 3. Place BTP service icons from the bundled library
 
@@ -212,6 +233,7 @@ sap-architecture/
     ├── extract_icon.py            — fuzzy service name → mxCell with grid-snapped geometry
     ├── extract_asset.py           — fuzzy any SAP starter-kit asset → mxCell snippet
     ├── check_asset_coverage.py    — smoke-check library/index/palette coverage
+    ├── scaffold_diagram.py        — copy the closest SAP template to a destination (FIRST STEP)
     ├── select_reference.py        — request text → ranked SAP template candidates
     ├── compare.py                 — pairwise fingerprint score against one reference
     ├── score_corpus.py            — candidate → best score across all references
@@ -222,13 +244,18 @@ sap-architecture/
 
 ## Anti-patterns — do NOT
 
-- **Don't** use `shape=mxgraph.sap.icon;SAPIcon=<Name>` stencils. They render as blank frames in many installations. Use the bundled inline SVG library.
+- **Don't draw from scratch.** Use `scaffold_diagram.py` first — every other anti-pattern below is a downstream consequence of writing the file by hand instead of starting from a SAP template.
+- **Don't set a dark, branded, or strongly tinted page background.** SAP diagrams use a white/transparent canvas. `pageBackgroundColor` set to `#1A1A1A`, `#0F2740`, etc. is a hard validator error.
+- **Don't invent flow-pill verbs.** Pills carry the canonical SAP vocabulary: `TRUST`, `Authenticate`, `Authentication`, `Authorization`, `A2A`, `MCP`, `ORD`, `HTTPS`, `OData/REST`, `REST/Token`, `SAML2/OIDC`, `OIDC`, `SCIM`, `Identity Lifecycle`, `Group`, `Role`, `Role Collection`, `Source`, `Target`, `Destination`. Verbs like `PROMPT`, `ROUTE`, `CONTEXT`, `DELEGATE`, `INVOKE`, `FETCH`, `EXECUTE` are validator warnings — replace them with the SAP equivalent or drop the pill entirely.
+- **Don't nest a focus zone inside the BTP zone if the SAP reference puts it beside.** Example: in `ac_RA0029_AgenticAI_root.drawio`, Joule is its own purple top-level zone, sibling to the blue BTP Subaccount, not a child. Get the zone hierarchy right first.
+- **Don't strip the SAP footer / branding band when relabeling a template.** Keep the SAP logos, the zone-band identifiers, and any QR / reference code the SAP file ships with.
+- **Don't connect cards with custom arrows.** Use library arrows; recolour with `strokeColor` only. Connector colors are SAP-mandated: trust=magenta `#CC00DC`, auth=green `#188918`, authorization=indigo `#5D36FF`, structural=slate `#475E75`, MCP=teal `#07838F`. The new `edge_palette` metric in compare.py penalises wrong colors.
 - **Don't** improvise palette values. Colors not listed in `palette-and-typography.md` trigger validator warnings.
 - **Don't** skip validation. Visual polish is not optional; the validator is the polish gate.
-- **Don't** put a legend inside the canvas. Narrate in the host Markdown page instead.
+- **Don't** put a legend inside the canvas if the chosen template doesn't have one. Narrate in the host Markdown page instead.
 - **Don't** forget `labelBackgroundColor=default` on edge labels — it's the single most common bug.
 - **Don't** resize a copied SAP template unless the user explicitly asks for a poster-sized rendering; preserving the source canvas improves corpus score.
-- **Don't** draw from scratch when a reference template is close — always start from the most-similar pristine `.drawio`.
+- **Don't** sprinkle multiple SAP logos. SAP guideline: "It is not recommended to use too many SAP logos in the same diagram. Use text only elements instead." (`product_names.md`)
 
 ## When the description is vague
 

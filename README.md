@@ -108,17 +108,19 @@ You have access to the SAP Architecture Skill. When the user asks for an SAP /
 BTP / on-prem architecture diagram, follow the 6-step workflow in SKILL.md:
 
 1. Parse description → plan (L0/L1/L2, zones, services, flow, accent)
-2. Pick the closest reference template with scripts/select_reference.py
-3. Place BTP service icons via scripts/extract_icon.py
-4. Compose the XML following references/layout.md, palette-and-typography.md,
-   shapes-and-edges.md
+2. ALWAYS scaffold from a SAP reference template (NEVER write XML from scratch):
+     scripts/scaffold_diagram.py "<request>" --out <destination>.drawio
+3. Place BTP service icons via scripts/extract_icon.py / extract_asset.py
+4. Make surgical label edits — do NOT rewrite the file. Preserve canvas size,
+   zone hierarchy, network divider, SAP logos, footer, and identity flow.
 5. MANDATORY: run scripts/autofix.py --write <file>, scripts/validate.py
    <file>, and scripts/score_corpus.py --min-score 90 <file>
 6. Print the flow narration as a numbered markdown list
 
-The canonical rules come from https://github.com/SAP/btp-solution-diagrams —
-Horizon palette, 16-px corner radius, grey-circle icons, trust=pink,
-auth=green, authorization=indigo, firewalls=thick grey.
+Hard rules enforced by the validator: no dark page backgrounds; flow pills must
+use canonical SAP verbs (TRUST/Authenticate/Authorization/A2A/MCP/ORD/HTTPS/
+OData/REST/SAML2/OIDC); preserve grey-circle icons; trust=pink, auth=green,
+authorization=indigo, firewalls=thick grey; 16-px corner radius.
 ```
 
 ---
@@ -374,10 +376,10 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/check_asset_cov
 When triggered, the skill runs a 6-step pipeline (documented in full in [`plugins/sap-architecture/skills/sap-architecture/SKILL.md`](plugins/sap-architecture/skills/sap-architecture/SKILL.md)):
 
 1. **Parse → plan** — infer level (L0/L1/L2, default L2), zones, services, numbered flow steps, and which service is the "star" (accent color).
-2. **Pick reference template** — run `select_reference.py`, then copy the closest pristine `.drawio` from the 63 bundled templates in `assets/reference-examples/`. *Never draw from scratch.*
+2. **Scaffold from a SAP reference template — MANDATORY** — run `scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks the 63 bundled SAP templates against the request, copies the best match to the destination, and prints alternates. The single most common cause of bad diagrams is the LLM trying to write XML from scratch — `scaffold_diagram.py` removes that temptation.
 3. **Place BTP service icons** — fuzzy-lookup each service via `extract_icon.py`, which emits an `<mxCell>` with the official inline-SVG data URI and grid-snapped geometry.
-4. **Compose the XML** — fill in the zones, cards, edges, and pills following `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`.
-5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py`, then `score_corpus.py --min-score 90`. Evaluation runs also score against the specific target reference; the skill doesn't hand you a diagram until validation passes and the score is close to SAP's templates.
+4. **Surgical relabel** — change labels, swap services, add a few cards next to the existing ones. **Preserve canvas size, zone hierarchy, network divider, SAP logos, footer, and identity flow.** Reference docs: `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`, `do-and-dont.md`.
+5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (now catches dark page backgrounds, novelty pill verbs like PROMPT/ROUTE/CONTEXT/DELEGATE, multi-logo over-use), then `score_corpus.py --min-score 90`. Evaluation runs also score against the specific target reference; the skill doesn't hand you a diagram until validation passes and the score is close to SAP's templates.
 6. **Narrate the flow** — print a numbered list explaining what each pill means, for pasting below the embedded image in Markdown / Confluence.
 
 ---

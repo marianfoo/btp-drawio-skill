@@ -47,8 +47,9 @@ sap-architecture/
             ├── extract_icon.py            — fuzzy icon name → mxCell
             ├── extract_asset.py           — fuzzy starter-kit asset → mxCell snippet
             ├── check_asset_coverage.py    — library/index/palette smoke check
-            ├── validate.py                — structural + style validator
+            ├── validate.py                — structural + style validator (catches dark bg, novelty pills)
             ├── autofix.py                 — mechanical fixes
+            ├── scaffold_diagram.py        — copy the closest SAP template (mandatory first step)
             ├── select_reference.py        — prompt → ranked SAP templates
             ├── compare.py                 — pairwise fingerprint score vs SAP refs
             ├── score_corpus.py            — best score across the reference corpus
@@ -71,10 +72,10 @@ For generic diagrams (flowcharts, ER, class) **without** an SAP angle, Claude fa
 ## Workflow (what happens when triggered)
 
 1. **Parse → plan** — infer level / zones / services / numbered flow / accent app from the description.
-2. **Pick reference template** — run `scripts/select_reference.py`, then copy the closest pristine `.drawio` from `assets/reference-examples/`. *Never draw from scratch.*
+2. **Scaffold from a SAP reference template — mandatory** — run `scripts/scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks bundled SAP templates against the request, copies the best match, and prints alternates. Never write XML from scratch.
 3. **Place library assets** — call `scripts/extract_icon.py` for each BTP service and `scripts/extract_asset.py` for generic icons, connector presets, number bubbles, interface pills, and other SAP starter-kit assets.
-4. **Compose XML** — fill in zones, cards, edges, pills per the four `references/*.md` sheets.
-5. **Validate + autofix + score — mandatory** — `autofix.py --write`, `validate.py`, then `score_corpus.py --min-score 90`. Evaluation runs also score against the specific target reference; the skill will not hand back a diagram until the validator exits clean and the fidelity score is high.
+4. **Surgically relabel** — change labels in-place; preserve canvas size, zone hierarchy, network divider, SAP logos, footer, identity flow.
+5. **Validate + autofix + score — mandatory** — `autofix.py --write`, `validate.py` (now catches dark `pageBackgroundColor`, off-vocabulary pill verbs like `PROMPT/ROUTE/CONTEXT/DELEGATE`, and duplicate SAP-logo over-use), then `score_corpus.py --min-score 90`. Evaluation runs also score against the specific target reference; the skill will not hand back a diagram until the validator exits clean and the fidelity score is high.
 6. **Narrate** — print a numbered markdown list explaining each pill / flow step, for pasting below the embedded image in Confluence / Markdown.
 
 Full details in [`skills/sap-architecture/SKILL.md`](skills/sap-architecture/SKILL.md).
@@ -87,6 +88,7 @@ All scripts use only the Python standard library — zero pip install required.
 |---|---|
 | `extract_icon.py "<name>"` | Fuzzy-lookup a BTP service icon; emit ready-to-paste `<mxCell>` with grid-snapped geometry. Supports abbreviations (XSUAA, CPI, HANA, CC, IAS, IPS, CAP, CF). `--list` shows all 100. |
 | `extract_asset.py "<name>" --kind <kind>` | Fuzzy-lookup any indexed SAP starter-kit asset: generic icons, connectors, area/default shapes, essentials, number markers, brand names, text elements, annotations/interfaces, and BTP service icons. |
+| `scaffold_diagram.py "<request>" --out <file>` | Copy the closest SAP reference template to a destination so editing starts from a pristine SAP-style file. Supports `--template` for an explicit pick, `--dry-run` to inspect candidates, and `--diagram-name` to rename the page. **The mandatory first step of the skill.** |
 | `select_reference.py "<request>"` | Rank bundled SAP templates for a natural-language request using curated metadata, filenames, aliases, levels, and visible labels. Use before editing XML. |
 | `validate.py <file>` | Structural + style validator. Catches bent arrows, text overflow, off-palette, off-grid, duplicate ids, sibling overlap, missing `labelBackgroundColor`. `--strict` turns warnings into errors. `--json` for machine-readable output. |
 | `autofix.py --write <file>` | Mechanical fixer: grid snap, hex case, `absoluteArcSize=1`, `strokeWidth` rounding, `fontFamily`→Helvetica. Writes a `.bak` backup. |

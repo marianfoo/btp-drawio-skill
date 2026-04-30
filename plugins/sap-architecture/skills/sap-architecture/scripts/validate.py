@@ -91,6 +91,45 @@ DATA_URI_RE = re.compile(r"data:image/[^&\";]+")
 GRID = 10
 ALLOWED_STROKE = {"1", "1.5", "2", "3", "4"}
 
+# Canonical SAP flow-pill vocabulary, extracted from the published reference
+# corpus. Pills with labels outside this set tend to indicate hand-crafted
+# diagrams rather than SAP-style flow narration. We don't enforce strictly —
+# many cases legitimately add custom verbs — but emit a warning so reviewers
+# can ratify the deviation.
+CANONICAL_PILL_LABELS = {
+    # identity / trust / auth
+    "trust", "authenticate", "authentication", "authorization",
+    "identity", "identity lifecycle", "customer-managed identity lifecycle",
+    "user", "usergroup", "group", "role", "role collection", "role collections",
+    "policy", "scim", "saml2/oidc", "oidc", "saml", "openid",
+    # transport
+    "https", "https/active", "https/standby", "rest", "rest/spi",
+    "rest/token", "rest / odata", "odata/rest", "odata/rest/soap",
+    # data flows
+    "destination", "source", "target", "harmonized api",
+    "data federation", "data sync", "task data",
+    # agentic ai vocab seen in RA0029 family
+    "a2a", "mcp", "ord",
+    # business
+    "business data cloud", "business role", "cdm",
+    # other observed
+    "role replica",
+    # generic but acceptable
+    "data", "metadata",
+}
+
+# Pill labels Codex observed in failed generations (PROMPT, ROUTE, CONTEXT,
+# DELEGATE, etc.) — explicit watch-list to surface the most common drift.
+NOVELTY_PILL_LABELS = {
+    "prompt", "route", "context", "delegate", "answer", "ask", "respond",
+    "query", "fetch", "invoke", "call", "execute", "run", "process",
+    "send", "receive", "publish", "subscribe", "transform",
+}
+
+# Light/neutral page backgrounds we accept. Anything else (dark, branded,
+# strongly tinted) is suspect because no SAP reference uses one.
+ALLOWED_PAGE_BACKGROUNDS = {None, "", "none", "default", "#ffffff", "#fff", "#FFFFFF", "#FFF"}
+
 
 # ---------- Report model -----------------------------------------------------
 
@@ -238,6 +277,18 @@ def validate(path: Path) -> Report:
 
     graphs = root.findall(".//mxGraphModel") or [root]
 
+    # Page background colour — SAP diagrams are always on a white/transparent canvas.
+    for graph_index, graph in enumerate(graphs):
+        bg = graph.get("background") or graph.get("pageBackgroundColor")
+        if bg and bg.strip().lower() not in {b.lower() for b in ALLOWED_PAGE_BACKGROUNDS if b}:
+            suffix = "" if len(graphs) == 1 else f" (page {graph_index + 1})"
+            report.add(
+                "error",
+                "style",
+                f"page background {bg!r}{suffix} — SAP diagrams use a white/transparent canvas; "
+                "remove the dark/branded background.",
+            )
+
     def scoped_id(graph_index: int, cell_id: str) -> str:
         return cell_id if len(graphs) == 1 else f"{graph_index}:{cell_id}"
 
@@ -362,6 +413,55 @@ def validate(path: Path) -> Report:
                             cell=cid,
                         )
 
+    # ---- pill / flow-narration vocabulary check ---------------------------
+    # A pill is roughly arcSize >= 40 with a label. SAP's published corpus uses
+    # a small canonical vocabulary (TRUST, Authenticate, A2A, MCP, ORD, HTTPS,
+    # OData/REST, …). Custom verbs like PROMPT/ROUTE/CONTEXT/DELEGATE indicate
+    # an LLM hand-crafted the diagram instead of starting from a template.
+    # Track the labels we saw, then warn for each one outside the canon.
+    seen_pill_labels: list[tuple[str, str]] = []  # (label, cid)
+    novelty_pills: list[tuple[str, str]] = []
+    for cid, cell in cells.items():
+        if cell.get("vertex") != "1":
+            continue
+        style = parse_style(cell.get("style"))
+        try:
+            arc = int(float(style.get("arcSize", "0")))
+        except ValueError:
+            arc = 0
+        if arc < 40:
+            continue
+        # Pill must be small (single line, < 200 px wide). Larger rounded
+        # shapes can be cards or banners, which use a separate label vocab.
+        g = geom(cell)
+        if not g or g[2] > 220 or g[3] > 60:
+            continue
+        raw = cell.get("value") or ""
+        # UserObject wrapping: a parent UserObject may carry the visible label
+        if not raw:
+            parent = parent_by_elem.get(id(cell))
+            if parent is not None and parent.tag == "UserObject":
+                raw = parent.get("value") or parent.get("label") or ""
+        label_text = strip_html(raw).strip()
+        if not label_text:
+            continue
+        seen_pill_labels.append((label_text, cid))
+        normalized = label_text.lower()
+        if normalized in CANONICAL_PILL_LABELS:
+            continue
+        # Single-token novelty pill — the most common LLM drift mode.
+        first_token = normalized.split()[0] if normalized else ""
+        if first_token in NOVELTY_PILL_LABELS:
+            novelty_pills.append((label_text, cid))
+            report.add(
+                "warning",
+                "text",
+                f"flow pill {label_text!r} is not in the canonical SAP vocabulary "
+                "(TRUST/Authenticate/A2A/MCP/ORD/HTTPS/OData/REST/…). "
+                "Replace with a SAP-style verb or remove the pill.",
+                cell=cid,
+            )
+
     # ---- sibling overlap checks (vertices sharing a parent) ---------------
     def is_transparent_or_chrome(cell: ET.Element) -> bool:
         """Cells that float on top of others by design and shouldn't be flagged."""
@@ -457,6 +557,24 @@ def validate(path: Path) -> Report:
                     "Either snap centers or add entryX/exitX anchors.",
                     cell=cid,
                 )
+
+    # ---- duplicate SAP logos check ----------------------------------------
+    # SAP guideline: "It is not recommended to use too many SAP logos in the
+    # same diagram." (product_names.md). One inline SAP_Logo.svg per zone-band
+    # is acceptable; more than ~4 in a single page is suspicious.
+    sap_logo_count = 0
+    for cid, cell in cells.items():
+        style = parse_style(cell.get("style"))
+        image = style.get("image")
+        if image and "sap_logo" in image.lower():
+            sap_logo_count += 1
+    if sap_logo_count > 6:
+        report.add(
+            "warning",
+            "style",
+            f"{sap_logo_count} SAP logos detected — SAP recommends limiting logo "
+            "repetition. Use text-only product labels instead beyond zone branding.",
+        )
 
     return report
 
