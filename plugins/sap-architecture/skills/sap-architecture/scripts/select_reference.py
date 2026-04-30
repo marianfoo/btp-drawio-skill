@@ -409,6 +409,29 @@ def score(path: Path, query: str) -> Candidate:
     if "aicore" in q_tokens and "aicore" in filename_tokens:
         value += 10
         reasons.append("exact AI Core filename match (+10)")
+    if {"agentic", "ai"} <= q_tokens:
+        root_agentic = path.name == "ac_RA0029_AgenticAI_root.drawio"
+        embodied_terms = {"embodied", "robotic", "robotics", "physical"}
+        root_signals = {
+            "gateway",
+            "orchestrator",
+            "capabilities",
+            "subaccount",
+            "businessdatacloud",
+            "successfactors",
+            "concur",
+            "s4hana",
+            "mcp",
+        } & q_tokens
+        if root_agentic and not (q_tokens & embodied_terms):
+            value += 24
+            reasons.append("generic Agentic AI root boost (+24)")
+            if len(root_signals) >= 2:
+                value += 12
+                reasons.append("Agentic AI root component match (+12)")
+        if ("embodied" in filename_tokens or "embodied" in m_tokens) and not (q_tokens & embodied_terms):
+            value -= 18
+            reasons.append("embodied-specific template penalty (-18)")
     if "joule" in filename_tokens and "joule" not in q_tokens:
         value -= 12
         reasons.append("Joule-specific template penalty (-12)")

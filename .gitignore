@@ -24,3 +24,4 @@ venv/
 # Claude Code local state
 .claude/local/
 .claude/sessions/
+.claude/worktrees/

@@ -384,8 +384,8 @@
       "family": "ra0029",
       "level": "l2",
       "domain": "agentic-ai",
-      "aliases": ["Agentic AI", "agentic AI root", "AI agents architecture"],
-      "tags": ["agentic", "ai", "agent", "agents", "joule", "tools"]
+      "aliases": ["Agentic AI", "Agentic AI on SAP BTP", "Agentic AI & AI Agents", "agentic AI root", "AI agents architecture", "SAP Joule User Interface", "Joule Orchestrator", "Joule Capabilities", "Agent Gateway"],
+      "tags": ["agentic", "ai", "agent", "agents", "joule", "tools", "mcp", "gateway", "orchestrator", "capabilities", "subaccount", "cloud-solutions", "s4hana", "successfactors", "businessdatacloud", "concur", "business-networks", "customer-experience", "identity"]
     },
     "ac_RA0029_EmbodiedAIAgents.drawio": {
       "title": "Embodied AI agents with SAP BTP",

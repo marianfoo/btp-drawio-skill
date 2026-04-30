@@ -55,7 +55,15 @@ Reference families now cover: Task Center, Build Work Zone, Build Process Automa
 2. Pick the closest **scenario family**: identity → IAS / IAM templates; data flow → Task Center / Build Work Zone; networking → Private Link / OData PrivateLink; AI → RA0029 family; multitenancy → SuSaaS.
 3. If two templates are close, prefer the simpler one. Don't try to inherit the busiest available diagram.
 
-Preserve the title band, zone containers, legend (if any), SAP logo, and the selected template's canvas size. For new diagrams without a clear source template, use `1169 × 827`. Rename `<diagram name="…">` to your subject. Prefer surgical relabeling over deletion. If cards or edges must change, duplicate existing template cells and keep similar zone density, icon count, pill count, and connector rhythm.
+Known anchor templates:
+
+- Full **Agentic AI / AI Agents with Joule** landscape → `ac_RA0029_AgenticAI_root.drawio`. This is the SAP Architecture Center-style template with SAP Joule, SAP BTP subaccount, Network divider, 3rd Party area, SAP Cloud Solutions, SAP Cloud Identity Services, and Architecture Center footer. Use `ac_RA0029_EmbodiedAIAgents.drawio` only when the prompt explicitly says embodied, robotic, physical agents, or custom implementation layer.
+- Focused **A2A / MCP** flow → `ac_RA0029_A2A_MCP.drawio`.
+- **Joule tool ecosystem** overview → `ac_RA0029_JouleAgentsToolsEcosystem.drawio`.
+
+Preserve the title band, zone containers, legend (if any), SAP logo, Architecture Center footer / QR / reference id (if any), and the selected template's canvas size. For new diagrams without a clear source template, use `1169 × 827`. Rename `<diagram name="…">` to your subject. Prefer surgical relabeling over deletion. If cards or edges must change, duplicate existing template cells and keep similar zone density, icon count, pill count, and connector rhythm.
+
+For Architecture Center templates such as `ac_RA0029_AgenticAI_root.drawio`, do **not** replace the white canvas, footer, network divider, or SAP-branded area structure with a dark dashboard layout. If the user asks for a "legend" but the chosen template has no separate bottom legend, satisfy that by preserving the existing inline pills/labels and printing the flow narration after the diagram.
 
 **Do not draw from scratch.** Starting from a pristine template is the single highest-fidelity trick in this skill.
 

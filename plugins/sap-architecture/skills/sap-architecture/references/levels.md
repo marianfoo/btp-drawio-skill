@@ -47,7 +47,7 @@ L0 implications for the skill:
 
 - All four zones (User, BTP, On-Prem, Third-Party) where applicable.
 - Numbered semantic pills on edges (TRUST, SIGN-IN, OAUTH · JWT, mTLS · PP, MCP TOOL CALL, …).
-- Legend **mandatory** — explains pill colors and line styles.
+- Legend **mandatory** in principle — explains pill colors and line styles. If the selected SAP reference template has no separate legend block but already uses labelled inline pills, preserve that template structure and put the legend explanation in the generated flow narration instead of adding a new bottom band.
 - Inline service icons (grey-circle variant only — see `diagr_comp/icons.md`).
 
 > "Including a legend in each diagram is crucial to clarify these meanings."

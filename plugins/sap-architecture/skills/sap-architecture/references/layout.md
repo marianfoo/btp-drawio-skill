@@ -88,6 +88,8 @@ Keep the title under ~60 chars and the subtitle under ~100. Longer strings need 
 - Edge pills are self-explanatory via color + label
 - The flow narration below the embedded PNG (in Markdown / Confluence) spells out what each color means
 
+When a selected SAP Architecture Center template already uses inline pills and no separate legend block, preserve that design. This matters for templates such as `ac_RA0029_AgenticAI_root.drawio`, where adding a large bottom legend forces the diagram away from the SAP reference layout and usually lowers the corpus score. If the user asks for a legend in that case, keep the inline pill labels and provide the legend explanation in the flow narration outside the canvas.
+
 If the user explicitly asks for an inside-canvas legend, put it at `y≈730`, full-width, a single neutral frame with two rows (lines + blocks).
 
 ## Aspect ratio & margins

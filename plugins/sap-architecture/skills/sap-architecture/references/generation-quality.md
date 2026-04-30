@@ -31,7 +31,9 @@ This checklist distills the research used to improve generated SAP BTP diagrams.
 ## Implementation consequences
 
 - `select_reference.py` prefers explicit reference families such as `RA0001`, preserves explicit L0/L1/L2 level hints, and reads curated `template-metadata.json` aliases/tags so generic labels like `Page-1` do not dominate selection.
+- Generic Agentic AI + Joule prompts should anchor on `ac_RA0029_AgenticAI_root.drawio`; use the Embodied AI template only for explicit embodied/robotic/physical-agent scenarios.
 - `eval_corpus.py create` provides a direct description-to-diagram path for smoke tests and examples.
+- Preserve SAP Architecture Center reference-canvas structure, including white background, SAP footer/reference id/QR where present, network dividers, and inline pill notation. Do not add a dark dashboard background or a bottom legend band to templates that do not already have one.
 - `eval_corpus.py run --exclude-target-template` now reports the nearest visual fallback templates computed from SAP fingerprints. These hints keep leave-one-out evaluation focused on visual fidelity when the exact target template is intentionally unavailable. Use `--no-style-neighbor-hints` for a pure semantic selector test.
 - The Ollama prompt now asks for protocols/flow semantics, target-audience consistency, and conservative template label replacements.
 - Model label edits do not rewrite reserved legend/notation labels such as `Access`, `Authentication`, `Authorization`, `Trust`, or `Deployment`.
