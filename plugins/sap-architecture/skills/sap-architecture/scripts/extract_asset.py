@@ -53,6 +53,7 @@ def tokens(text: str) -> set[str]:
 
 def find_asset(index: dict[str, Any], query: str, kind: str | None) -> tuple[str, dict[str, Any]] | None:
     assets = index["assets"]
+    query_raw = query.strip()
     query_slug = slugify(query)
     query_tokens = tokens(query)
 
@@ -63,9 +64,15 @@ def find_asset(index: dict[str, Any], query: str, kind: str | None) -> tuple[str
     ]
 
     for key, asset in filtered:
-        if query_slug == key or query_slug == key.split(":", 1)[-1]:
+        key_short = key.split(":", 1)[-1]
+        if (
+            query_raw == key
+            or query_raw == key_short
+            or query_slug == slugify(key)
+            or query_slug == slugify(key_short)
+        ):
             return key, asset
-        if query_slug in asset.get("aliases", []):
+        if query_slug in {slugify(alias) for alias in asset.get("aliases", [])}:
             return key, asset
 
     candidates: list[tuple[int, str, dict[str, Any]]] = []

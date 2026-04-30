@@ -250,6 +250,20 @@ Return JSON only. Do not return XML. Do not use markdown fences.
 Create a concise generation plan for this request:
 {case.description}
 
+Use the selected SAP template as the base, not a blank canvas:
+{case.selected_template}
+
+Available local SAP starter-kit assets:
+- extract_icon.py for BTP service icons
+- extract_asset.py for generic icons, connector presets, area/default shapes, number markers, SAP brand names, text elements, and annotation/interface pills
+
+Avoid these visual risks:
+- generic draw.io colors such as #dae8fc, #d5e8d4, #f8cecc, or #fff2cc
+- hand-authored arrows when a connector preset exists
+- external image URLs
+- clipped labels or oversized text inside service cards
+- replacing SAP grey-circle service icons with blank mxgraph stencils
+
 Use these keys:
 title: short diagram title
 subtitle: one sentence subtitle

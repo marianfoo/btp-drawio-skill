@@ -34,6 +34,7 @@ Run: python3 validate.py <file.drawio>
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import sys
@@ -169,12 +170,33 @@ def approx_text_width(text: str, font_size: float, bold: bool = False) -> float:
     return len(text) * font_size * coef
 
 
+def visible_label_lines(label: str) -> list[str]:
+    """Reduce an HTML-ish draw.io label to visible text lines."""
+    label = html.unescape(label or "")
+    label = re.sub(r"</(?:div|p|li)>", "\n", label, flags=re.I)
+    label = re.sub(r"<br\s*/?>", "\n", label, flags=re.I)
+    no_tags = re.sub(r"<[^>]+>", "", label)
+    lines = [re.sub(r"\s+", " ", line).strip() for line in no_tags.splitlines()]
+    return [line for line in lines if line]
+
+
 def strip_html(label: str) -> str:
     """Reduce HTML label to its visible text (rough)."""
-    # replace <br/> with spaces, then strip tags
-    no_br = re.sub(r"<br\s*/?>", " ", label, flags=re.I)
-    no_tags = re.sub(r"<[^>]+>", "", no_br)
-    return re.sub(r"\s+", " ", no_tags).strip()
+    return " ".join(visible_label_lines(label))
+
+
+def html_font_size(label: str, fallback: float) -> float:
+    """Best-effort font-size extraction from draw.io rich text labels."""
+    sizes: list[float] = []
+    for value in re.findall(r"font-size\s*:\s*([0-9.]+)\s*px", label or "", flags=re.I):
+        try:
+            sizes.append(float(value))
+        except ValueError:
+            pass
+    for value in re.findall(r"<font[^>]*\bsize=[\"']?([0-9]+)", label or "", flags=re.I):
+        # draw.io/browser HTML font size 1 renders small; this is only a fit heuristic.
+        sizes.append({"1": 10.0, "2": 11.0, "3": 12.0, "4": 14.0, "5": 18.0, "6": 24.0, "7": 32.0}.get(value, fallback))
+    return min(sizes) if sizes else fallback
 
 
 def bbox_overlap(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
@@ -283,6 +305,13 @@ def validate(path: Path) -> Report:
         if ff and ff.lower() != "helvetica":
             report.add("warning", "style", f"fontFamily={ff!r} (expected Helvetica)", cell=cid)
 
+        # Image source hygiene
+        image = style.get("image")
+        if image and image.startswith(("http://", "https://")):
+            report.add("warning", "style", "external image URL — prefer bundled SAP inline assets", cell=cid)
+        elif image and not (image.startswith("data:image/") or image == "img/lib/sap/SAP_Logo.svg"):
+            report.add("warning", "style", f"non-bundled image source {image!r}", cell=cid)
+
         # Stroke width
         sw = style.get("strokeWidth")
         if sw and sw not in ALLOWED_STROKE:
@@ -303,9 +332,10 @@ def validate(path: Path) -> Report:
 
         # Text overflow (vertex only, has a label, has geometry)
         if cell.get("vertex") == "1" and g:
-            label = strip_html(cell.get("value") or "")
-            if label:
-                font_size = float(style.get("fontSize", "12"))
+            raw_label = cell.get("value") or ""
+            label = strip_html(raw_label)
+            if label and style.get("autosize") != "1" and style.get("shape") != "image" and "image" not in style:
+                font_size = html_font_size(raw_label, float(style.get("fontSize", "12")))
                 bold = style.get("fontStyle", "0") in {"1", "3", "5", "7"}
                 spacing = float(style.get("spacingLeft", "0")) + float(style.get("spacingRight", "0"))
                 wrap = style.get("whiteSpace") == "wrap" and style.get("html") == "1"
@@ -314,7 +344,7 @@ def validate(path: Path) -> Report:
                     # With wrapping, only the single longest token needs to fit
                     longest = max(label.split(), key=len, default="")
                     need = approx_text_width(longest, font_size, bold)
-                    if effective_w > 0 and need > effective_w + 2:
+                    if effective_w > 0 and need > effective_w + 6:
                         report.add(
                             "warning",
                             "text",
@@ -322,8 +352,9 @@ def validate(path: Path) -> Report:
                             cell=cid,
                         )
                 else:
-                    need = approx_text_width(label, font_size, bold)
-                    if effective_w > 0 and need > effective_w:
+                    longest_line = max(visible_label_lines(raw_label) or [label], key=len)
+                    need = approx_text_width(longest_line, font_size, bold)
+                    if effective_w > 0 and need > effective_w + 6:
                         report.add(
                             "warning",
                             "text",

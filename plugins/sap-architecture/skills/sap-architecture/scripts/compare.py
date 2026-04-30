@@ -41,7 +41,9 @@ from pathlib import Path
 
 HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
 DATA_URI_RE = re.compile(r"data:image/[^&\";]+")
-ICON_RE = re.compile(r"shape=image[^\"]*image=data:image/svg")
+ICON_RE = re.compile(r"shape=image[^\"]*image=data:image/svg|shape=mxgraph\.sap\.icon")
+EXTERNAL_IMAGE_RE = re.compile(r"shape=image[^\"]*image=https?://|image=https?://")
+SHAPE_RE = re.compile(r"(?:^|;)shape=([^;\"]+)")
 ARC16_RE = re.compile(r"arcSize=16\b")
 ARC50_RE = re.compile(r"arcSize=50\b")
 ABS_ARC_RE = re.compile(r"absoluteArcSize=1\b")
@@ -66,6 +68,7 @@ class Fingerprint:
     edges: int = 0
     zones: int = 0
     icons: int = 0
+    external_images: int = 0
     pills: int = 0
     grid_snap_rate: float = 0.0
     has_absolute_arc: bool = False
@@ -73,6 +76,7 @@ class Fingerprint:
     palette: set[str] = field(default_factory=set)
     fonts: set[str] = field(default_factory=set)
     stroke_widths: set[float] = field(default_factory=set)
+    shapes: set[str] = field(default_factory=set)
 
 
 def fingerprint(path: Path) -> Fingerprint:
@@ -106,6 +110,11 @@ def fingerprint(path: Path) -> Fingerprint:
             style = c.get("style") or ""
             if ICON_RE.search(style):
                 fp.icons += 1
+            if EXTERNAL_IMAGE_RE.search(style):
+                fp.external_images += 1
+            for shape in SHAPE_RE.findall(style):
+                if shape != "image":
+                    fp.shapes.add(shape)
             if ARC50_RE.search(style):
                 fp.pills += 1
             elif ARC16_RE.search(style) and "strokeWidth=1.5" in style and "fontStyle=1" in style:
@@ -163,6 +172,7 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
     if ref.zones > 0 or cand.zones > 0:
         parts["zones"] = ratio(ref.zones, cand.zones)
     parts["icons"] = ratio(ref.icons, cand.icons)
+    parts["external_images"] = 1.0 if cand.external_images <= ref.external_images else ratio(ref.external_images, cand.external_images)
     parts["edges"] = ratio(ref.edges, cand.edges)
     parts["vertices"] = ratio(ref.vertices, cand.vertices)
     parts["pills"] = ratio(ref.pills, cand.pills) if (ref.pills or cand.pills) else 1.0
@@ -182,6 +192,12 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
         r.diffs.append(f"fonts: ref={sorted(ref.fonts)} cand={sorted(cand.fonts)}")
 
     parts["strokes"] = jaccard(ref.stroke_widths, cand.stroke_widths)
+    parts["shapes"] = jaccard(ref.shapes, cand.shapes)
+    extra_shapes = cand.shapes - ref.shapes
+    if extra_shapes:
+        r.diffs.append(f"shape styles in candidate not in reference: {sorted(extra_shapes)[:8]}")
+    if cand.external_images > ref.external_images:
+        r.diffs.append(f"external image count increased — ref {ref.external_images} vs cand {cand.external_images}")
     parts["abs_arc"] = 1.0 if ref.has_absolute_arc == cand.has_absolute_arc else 0.5
     parts["label_bg"] = 1.0 if ref.has_label_bg == cand.has_label_bg else 0.5
     # grid_snap: candidate at-or-above reference scores 1.0; else proportional.
@@ -200,12 +216,14 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
         "canvas": 1.0,
         "zones": 1.5,
         "icons": 1.5,
+        "external_images": 0.5,
         "edges": 1.0,
         "vertices": 0.5,
         "pills": 0.5,
         "palette": 1.5,
         "fonts": 1.0,
         "strokes": 0.5,
+        "shapes": 1.0,
         "abs_arc": 0.5,
         "label_bg": 0.5,
         "grid_snap": 1.0,
@@ -245,7 +263,7 @@ def main() -> int:
         }
         # sets aren't JSON-serializable; coerce
         for fp_dict in (out["reference"], out["candidate"]):
-            for k in ("palette", "fonts", "stroke_widths"):
+            for k in ("palette", "fonts", "stroke_widths", "shapes"):
                 fp_dict[k] = sorted(fp_dict[k])
         print(json.dumps(out, indent=2))
         return 0
