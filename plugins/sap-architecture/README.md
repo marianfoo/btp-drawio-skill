@@ -26,6 +26,7 @@ sap-architecture/
         │   ├── layout.md                  — canvas skeleton + zone-by-zone placement
         │   ├── do-and-dont.md             — consolidated SAP rules with verbatim quotes
         │   ├── corpus-findings.md         — 2026 SAP corpus profile
+        │   ├── generation-quality.md      — research-backed output checklist
         │   └── methodology.md             — comparison harness, fidelity claim
         ├── assets/
         │   ├── libraries/                 — 10 SAP draw.io starter-kit libraries
@@ -88,6 +89,7 @@ All scripts use only the Python standard library — zero pip install required.
 | `autofix.py --write <file>` | Mechanical fixer: grid snap, hex case, `absoluteArcSize=1`, `strokeWidth` rounding, `fontFamily`→Helvetica. Writes a `.bak` backup. |
 | `compare.py <reference> <candidate>` | Pairwise structural/style/content fingerprint score. |
 | `score_corpus.py <candidate>` | Score a candidate against all bundled references; `--min-score 90` makes it a gate. |
+| `eval_corpus.py create "..."` | Create one diagram from a natural-language description, optionally with Ollama planning and model-plan label application. |
 | `eval_corpus.py run --generator ollama` | Opt-in target-aware corpus loop for local Ollama experiments. Use `--exclude-target-template` for honest leave-one-out tests. Writes candidates and reports under `.cache/sap-architecture-eval/`. |
 | `build_icon_index.py` | Re-parse the BTP service icon library into `assets/icon-index.json`. Run after refreshing the library from SAP upstream. |
 | `build_asset_index.py` | Re-parse all bundled SAP draw.io libraries into `assets/asset-index.json`. |

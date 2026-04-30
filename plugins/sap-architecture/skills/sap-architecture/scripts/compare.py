@@ -60,6 +60,11 @@ STOPWORDS = {
     "l1", "l2", "of", "on", "or", "page", "ref", "reference", "sap", "show",
     "solution", "style", "the", "to", "use", "using", "via", "with",
 }
+TOKEN_CANONICAL = {
+    "adminstrator": "administrator",
+    "plaforms": "platforms",
+    "provisoning": "provisioning",
+}
 
 
 # --- Fingerprint ---------------------------------------------------------------
@@ -108,6 +113,7 @@ def tokens(text: str) -> set[str]:
     words = split_words(text)
     joined = "".join(words)
     for word in words:
+        word = TOKEN_CANONICAL.get(word, word)
         if len(word) >= 2 and word not in STOPWORDS:
             out.add(word)
     for compact in ("xsuaa", "privatelink", "workzone", "eventmesh", "multiaz", "multiregion", "businessdatacloud"):

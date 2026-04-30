@@ -29,6 +29,11 @@ STOPWORDS = {
     "ref", "reference", "sap", "show", "solution", "the", "to", "using",
     "via", "with",
 }
+TOKEN_CANONICAL = {
+    "adminstrator": "administrator",
+    "plaforms": "platforms",
+    "provisoning": "provisioning",
+}
 
 SCENARIOS = [
     {
@@ -128,6 +133,7 @@ def split_words(text: str) -> list[str]:
 def tokens(text: str) -> set[str]:
     out: set[str] = set()
     for t in split_words(text):
+        t = TOKEN_CANONICAL.get(t, t)
         if len(t) >= 2 and t not in STOPWORDS:
             out.add(t)
     joined = "".join(split_words(text))
@@ -170,6 +176,11 @@ def explicit_level(query: str) -> str | None:
     return f"l{m.group(1)}" if m else None
 
 
+def explicit_family(query: str) -> str | None:
+    m = re.search(r"\bRA(\d{4})\b", query, flags=re.I)
+    return f"ra{m.group(1)}" if m else None
+
+
 def score(path: Path, query: str) -> Candidate:
     q_tokens = tokens(query)
     doc_text = drawio_text(path)
@@ -188,7 +199,16 @@ def score(path: Path, query: str) -> Candidate:
         reasons.append("filename match: " + ", ".join(filename_hits[:8]))
 
     level = explicit_level(query)
+    family = explicit_family(query)
     filename_lower = path.name.lower()
+    path_lower = str(path).lower()
+    if family:
+        if family in path_lower:
+            value += 12
+            reasons.append(f"explicit {family.upper()} family match (+12)")
+        elif re.search(r"\bra\d{4}\b", path_lower):
+            value -= 4
+            reasons.append(f"different reference family penalty (-4)")
     if level:
         if level in filename_lower:
             value += 10

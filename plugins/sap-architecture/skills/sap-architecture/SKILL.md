@@ -98,6 +98,7 @@ Build the full `.drawio` file following these references (every value cited back
 - `references/palette-and-typography.md` — Horizon hex values + Helvetica hierarchy
 - `references/shapes-and-edges.md` — zone / card / pill / edge style strings, semantic line colors
 - `references/do-and-dont.md` — consolidated SAP rules (alternation, color proportion, one-logo, line-style semantics, …)
+- `references/generation-quality.md` — title/scope, relationship-label, abstraction-level, and model-output quality checklist
 
 Rules that matter most (the ones every junior attempt gets wrong):
 
@@ -179,6 +180,7 @@ sap-architecture/
 │   ├── shapes-and-edges.md        — style strings + center-alignment + line semantics
 │   ├── layout.md                  — canvas skeleton + zone-by-zone placement
 │   ├── do-and-dont.md             — consolidated SAP rules with verbatim quotes
+│   ├── generation-quality.md      — research-backed output checklist
 │   └── corpus-findings.md         — 2026 corpus profile from SAP's public repos
 ├── assets/
 │   ├── libraries/
