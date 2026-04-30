@@ -1,0 +1,511 @@
+{
+  "version": 1,
+  "purpose": "Scenario metadata used by select_reference.py and eval_corpus.py. The draw.io files remain the source of visual truth; this file improves template selection when visible diagram labels are generic or noisy.",
+  "templates": {
+    "ac_RA0001_E2B_CloudConnector.drawio": {
+      "title": "Enterprise to business connectivity with SAP Cloud Connector",
+      "family": "ra0001",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["E2B Cloud Connector", "Cloud Connector", "principal propagation", "hybrid connectivity"],
+      "tags": ["e2b", "cloudconnector", "private-connectivity", "principalpropagation", "on-premise", "destination", "identity"]
+    },
+    "ac_RA0001_E2B_PrivateLink.drawio": {
+      "title": "Enterprise to business connectivity with SAP Private Link",
+      "family": "ra0001",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["E2B Private Link", "SAP Private Link", "private endpoint", "private connectivity"],
+      "tags": ["e2b", "privatelink", "private-connectivity", "destination", "identity", "multicloud"]
+    },
+    "ac_RA0001_EventDriven_HybridEnterprise.drawio": {
+      "title": "Event-driven architecture for hybrid heterogeneous enterprise landscapes",
+      "family": "ra0001",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["Hybrid Enterprise EDA", "heterogeneous enterprise EDA", "advanced event mesh"],
+      "tags": ["event-driven", "eda", "eventmesh", "advanced-event-mesh", "hybrid", "integration"]
+    },
+    "ac_RA0001_EventDriven_RefArch.drawio": {
+      "title": "Event-driven reference architecture on SAP BTP",
+      "family": "ra0001",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["EDA reference architecture", "event mesh reference architecture", "CAP event-driven architecture"],
+      "tags": ["event-driven", "eda", "eventmesh", "cap", "hana", "workzone", "identity"]
+    },
+    "ac_RA0001_EventDriven_SAPEnterprise.drawio": {
+      "title": "Event-driven architecture for SAP intelligent enterprise",
+      "family": "ra0001",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["SAP intelligent enterprise EDA", "SAP enterprise event architecture"],
+      "tags": ["event-driven", "eda", "eventmesh", "sap-enterprise", "integration"]
+    },
+    "ac_RA0002_LoadBalancer.drawio": {
+      "title": "Load-balanced resilient SAP BTP deployment",
+      "family": "ra0002",
+      "level": "l2",
+      "domain": "resiliency",
+      "aliases": ["load balancer", "traffic routing", "regional load balancing"],
+      "tags": ["resiliency", "loadbalancer", "routing", "availability", "failover"]
+    },
+    "ac_RA0002_MultiAZ.drawio": {
+      "title": "Multi-availability-zone SAP BTP deployment",
+      "family": "ra0002",
+      "level": "l2",
+      "domain": "resiliency",
+      "aliases": ["Multi-AZ", "availability zones", "high availability"],
+      "tags": ["resiliency", "multiaz", "availability-zone", "high-availability", "failover"]
+    },
+    "ac_RA0002_MultiRegionResiliency.drawio": {
+      "title": "Multi-region resiliency for SAP BTP",
+      "family": "ra0002",
+      "level": "l2",
+      "domain": "resiliency",
+      "aliases": ["multi region resiliency", "disaster recovery", "regional failover"],
+      "tags": ["resiliency", "multiregion", "disaster-recovery", "availability", "failover"]
+    },
+    "ac_RA0003_FederatedML.drawio": {
+      "title": "Federated machine learning with SAP AI Core",
+      "family": "ra0003",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["Federated ML", "federated machine learning", "AI Core training", "machine learning federation"],
+      "tags": ["federated", "ml", "machine-learning", "aicore", "ai", "training", "models", "data-science"]
+    },
+    "ac_RA0004_AWSDataIntegration.drawio": {
+      "title": "Data integration between SAP and AWS",
+      "family": "ra0004",
+      "level": "l2",
+      "domain": "data",
+      "aliases": ["AWS data integration", "Amazon S3 data integration", "AWS hyperscaler data"],
+      "tags": ["data-integration", "aws", "hyperscaler", "s3", "datasphere", "hana"]
+    },
+    "ac_RA0004_AzureDataIntegration.drawio": {
+      "title": "Data integration between SAP and Microsoft Azure",
+      "family": "ra0004",
+      "level": "l2",
+      "domain": "data",
+      "aliases": ["Azure data integration", "Microsoft Azure integration", "Azure hyperscaler data"],
+      "tags": ["data-integration", "azure", "hyperscaler", "datasphere", "hana"]
+    },
+    "ac_RA0004_DatabricksDataIntegration.drawio": {
+      "title": "Data integration between SAP and Databricks",
+      "family": "ra0004",
+      "level": "l2",
+      "domain": "data",
+      "aliases": ["Databricks data integration", "SAP Databricks integration"],
+      "tags": ["data-integration", "databricks", "hyperscaler", "datasphere", "hana"]
+    },
+    "ac_RA0004_HyperscalerData.drawio": {
+      "title": "Hyperscaler data integration with SAP",
+      "family": "ra0004",
+      "level": "l2",
+      "domain": "data",
+      "aliases": ["hyperscaler data", "data lake integration", "cloud data integration"],
+      "tags": ["data-integration", "hyperscaler", "aws", "azure", "databricks", "datasphere"]
+    },
+    "ac_RA0005_Agent2Agent.drawio": {
+      "title": "Agent-to-agent integration",
+      "family": "ra0005",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["Agent2Agent", "A2A agents", "agent to agent"],
+      "tags": ["agentic", "a2a", "agent", "agents", "genai", "tools"]
+    },
+    "ac_RA0005_GenAI.drawio": {
+      "title": "Generative AI reference architecture",
+      "family": "ra0005",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["GenAI", "generative AI", "AI foundation"],
+      "tags": ["genai", "generative-ai", "ai", "aicore", "models"]
+    },
+    "ac_RA0005_GenAI_RAG.drawio": {
+      "title": "Generative AI retrieval-augmented generation",
+      "family": "ra0005",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["RAG", "retrieval augmented generation", "grounded generation"],
+      "tags": ["genai", "rag", "retrieval", "embedding", "vector", "semantic-search"]
+    },
+    "ac_RA0005_GenAI_SemanticSearch.drawio": {
+      "title": "Generative AI semantic search",
+      "family": "ra0005",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["semantic search", "vector search", "embedding search"],
+      "tags": ["genai", "semantic-search", "embedding", "vector", "rag"]
+    },
+    "ac_RA0006_PrivateLinkService.drawio": {
+      "title": "SAP Private Link Service",
+      "family": "ra0006",
+      "level": "l2",
+      "domain": "networking",
+      "aliases": ["Private Link Service", "private link service", "private endpoint service"],
+      "tags": ["privatelink", "private-connectivity", "networking", "endpoint"],
+      "generic": true
+    },
+    "ac_RA0007_SuSaaS_CAP_Multitenant.drawio": {
+      "title": "Sustainable SaaS with CAP multitenancy",
+      "family": "ra0007",
+      "level": "l2",
+      "domain": "application-development",
+      "aliases": ["CAP multitenant SaaS", "multitenancy", "SaaS CAP"],
+      "tags": ["cap", "saas", "multitenant", "tenant", "subscription", "hana", "xsuaa"]
+    },
+    "ac_RA0008_EdgeIntegrationCell.drawio": {
+      "title": "SAP Integration Suite Edge Integration Cell",
+      "family": "ra0008",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["Edge Integration Cell", "EIC Runtime", "Integration Suite EIC"],
+      "tags": ["edge", "eic", "edge-integration-cell", "integration-suite", "runtime", "kubernetes", "postgresql", "redis"]
+    },
+    "ac_RA0009_TaskCenter_CentralInbox.drawio": {
+      "title": "SAP Task Center central inbox",
+      "family": "ra0009",
+      "level": "l2",
+      "domain": "process",
+      "aliases": ["Task Center central inbox", "central inbox", "task aggregation"],
+      "tags": ["taskcenter", "task", "inbox", "workflow", "process"]
+    },
+    "ac_RA0010_BuildWorkZone.drawio": {
+      "title": "SAP Build Work Zone",
+      "family": "ra0010",
+      "level": "l2",
+      "domain": "experience",
+      "aliases": ["Build Work Zone", "Work Zone", "digital workplace"],
+      "tags": ["workzone", "build", "launchpad", "site", "experience"]
+    },
+    "ac_RA0013_BDC_AICore.drawio": {
+      "title": "SAP Business Data Cloud with SAP AI Core",
+      "family": "ra0013",
+      "level": "l2",
+      "domain": "data-ai",
+      "aliases": ["BDC AI Core", "Business Data Cloud AI Core"],
+      "tags": ["bdc", "businessdatacloud", "aicore", "ai", "data", "models"]
+    },
+    "ac_RA0013_BDC_CloudIdentity.drawio": {
+      "title": "SAP Business Data Cloud with Cloud Identity Services",
+      "family": "ra0013",
+      "level": "l2",
+      "domain": "data",
+      "aliases": ["BDC Cloud Identity", "Business Data Cloud identity"],
+      "tags": ["bdc", "businessdatacloud", "identity", "authentication", "ias", "data"]
+    },
+    "ac_RA0013_BDC_Databricks.drawio": {
+      "title": "SAP Business Data Cloud with Databricks",
+      "family": "ra0013",
+      "level": "l2",
+      "domain": "data",
+      "aliases": ["BDC Databricks", "Business Data Cloud Databricks"],
+      "tags": ["bdc", "businessdatacloud", "databricks", "data", "analytics"]
+    },
+    "ac_RA0013_BusinessDataCloud.drawio": {
+      "title": "SAP Business Data Cloud",
+      "family": "ra0013",
+      "level": "l2",
+      "domain": "data",
+      "aliases": ["Business Data Cloud", "BDC"],
+      "tags": ["bdc", "businessdatacloud", "data", "analytics", "datasphere"]
+    },
+    "ac_RA0014_OData_AppRouter_PrivateLink.drawio": {
+      "title": "OData through App Router and SAP Private Link",
+      "family": "ra0014",
+      "level": "l2",
+      "domain": "application-development",
+      "aliases": ["OData App Router Private Link", "AppRouter Private Link"],
+      "tags": ["odata", "approuter", "privatelink", "cap", "private-connectivity"]
+    },
+    "ac_RA0014_OData_CAP_PrivateLink.drawio": {
+      "title": "OData through CAP and SAP Private Link",
+      "family": "ra0014",
+      "level": "l2",
+      "domain": "application-development",
+      "aliases": ["OData CAP Private Link", "CAP Private Link"],
+      "tags": ["odata", "cap", "privatelink", "private-connectivity"]
+    },
+    "ac_RA0018_BuildProcessAutomation.drawio": {
+      "title": "SAP Build Process Automation",
+      "family": "ra0018",
+      "level": "l2",
+      "domain": "process",
+      "aliases": ["Build Process Automation", "SAP BPA", "workflow automation"],
+      "tags": ["process-automation", "workflow", "task", "build", "automation"]
+    },
+    "ac_RA0019_Authentication.drawio": {
+      "title": "Identity and access management authentication",
+      "family": "ra0019",
+      "level": "l2",
+      "domain": "identity",
+      "aliases": ["IAM authentication", "Cloud Identity authentication", "IAS authentication"],
+      "tags": ["iam", "identity", "authentication", "authn", "ias", "oauth", "oidc", "saml"]
+    },
+    "ac_RA0019_Authorization.drawio": {
+      "title": "Identity and access management authorization",
+      "family": "ra0019",
+      "level": "l2",
+      "domain": "identity",
+      "aliases": ["IAM authorization", "role collection authorization", "RBAC"],
+      "tags": ["iam", "identity", "authorization", "authz", "roles", "scopes", "rbac"]
+    },
+    "ac_RA0019_IAM_overview.drawio": {
+      "title": "Identity and access management overview",
+      "family": "ra0019",
+      "level": "l2",
+      "domain": "identity",
+      "aliases": ["IAM overview", "identity access management overview"],
+      "tags": ["iam", "identity", "authentication", "authorization", "ias", "xsuaa"]
+    },
+    "ac_RA0019_IdentityLifecycle.drawio": {
+      "title": "Identity lifecycle management",
+      "family": "ra0019",
+      "level": "l2",
+      "domain": "identity",
+      "aliases": ["identity lifecycle", "identity provisioning", "SCIM provisioning"],
+      "tags": ["iam", "identity", "lifecycle", "provisioning", "scim", "ias"]
+    },
+    "ac_RA0020_B2BIntegration.drawio": {
+      "title": "Business-to-business integration",
+      "family": "ra0020",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["B2B integration", "trading partner integration"],
+      "tags": ["b2b", "integration", "edi", "trading-partner", "integration-suite"]
+    },
+    "ac_RA0021_A2AIntegration.drawio": {
+      "title": "Application-to-application integration",
+      "family": "ra0021",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["A2A integration", "application integration"],
+      "tags": ["a2a", "integration", "application-integration", "integration-suite"]
+    },
+    "ac_RA0022_APIManagedIntegration.drawio": {
+      "title": "API-managed integration",
+      "family": "ra0022",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["API Management integration", "managed API integration"],
+      "tags": ["api-management", "api", "integration", "integration-suite"]
+    },
+    "ac_RA0023_DevOps.drawio": {
+      "title": "DevOps with SAP BTP CI/CD and Cloud Transport Management",
+      "family": "ra0023",
+      "level": "l2",
+      "domain": "devops",
+      "aliases": ["DevOps", "CI/CD", "Cloud Transport Management", "Terraform Provider for SAP BTP"],
+      "tags": ["devops", "cicd", "pipeline", "transport", "terraform", "deployment", "cloud-transport-management"]
+    },
+    "ac_RA0024_Joule_IAM_CDM.drawio": {
+      "title": "Joule IAM with central data model",
+      "family": "ra0024",
+      "level": "l2",
+      "domain": "ai-identity",
+      "aliases": ["Joule IAM CDM", "Joule central data model"],
+      "tags": ["joule", "iam", "identity", "cdm", "ai"]
+    },
+    "ac_RA0024_Joule_IAM_authn.drawio": {
+      "title": "Joule IAM authentication",
+      "family": "ra0024",
+      "level": "l2",
+      "domain": "ai-identity",
+      "aliases": ["Joule authentication", "Joule IAM authn"],
+      "tags": ["joule", "iam", "authentication", "authn", "ias", "ai"]
+    },
+    "ac_RA0024_Joule_S4PublicCloud.drawio": {
+      "title": "Joule with SAP S/4HANA Public Cloud",
+      "family": "ra0024",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["Joule S/4HANA Public Cloud", "Joule S4 public cloud"],
+      "tags": ["joule", "s4hana", "public-cloud", "ai"]
+    },
+    "ac_RA0024_Joule_Studio.drawio": {
+      "title": "SAP Joule Studio",
+      "family": "ra0024",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["Joule Studio", "custom Joule skills"],
+      "tags": ["joule", "studio", "ai", "agent", "skills"]
+    },
+    "ac_RA0024_UnifiedJoule.drawio": {
+      "title": "Unified Joule",
+      "family": "ra0024",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["Unified Joule", "Joule unified experience"],
+      "tags": ["joule", "unified", "ai", "agent"]
+    },
+    "ac_RA0025_PIPO_EIC_Post.drawio": {
+      "title": "PI/PO to Edge Integration Cell post-migration architecture",
+      "family": "ra0025",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["PI/PO EIC post migration", "PI PO Edge Integration Cell after migration", "EIC post"],
+      "tags": ["pipo", "pi", "po", "eic", "edge-integration-cell", "migration", "integration-suite", "post"]
+    },
+    "ac_RA0025_PIPO_EIC_Pre.drawio": {
+      "title": "PI/PO to Edge Integration Cell pre-migration architecture",
+      "family": "ra0025",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["PI/PO EIC pre migration", "PI PO before Edge Integration Cell", "EIC pre"],
+      "tags": ["pipo", "pi", "po", "eic", "edge-integration-cell", "migration", "integration-suite", "pre"]
+    },
+    "ac_RA0027_SIEM_SOAR_ETD.drawio": {
+      "title": "SIEM and SOAR with SAP Enterprise Threat Detection",
+      "family": "ra0027",
+      "level": "l2",
+      "domain": "security",
+      "aliases": ["SIEM SOAR ETD", "Enterprise Threat Detection", "security operations"],
+      "tags": ["siem", "soar", "etd", "threat-detection", "security", "audit", "security-operations"]
+    },
+    "ac_RA0028_SuccessFactorsModuleIntegration.drawio": {
+      "title": "SAP SuccessFactors module integration",
+      "family": "ra0028",
+      "level": "l2",
+      "domain": "hxm",
+      "aliases": ["SuccessFactors module integration", "SAP SuccessFactors Suite", "BizX module integration"],
+      "tags": ["successfactors", "hxm", "bizx", "recruiting", "talent", "employee", "module-integration"]
+    },
+    "ac_RA0029_A2A_MCP.drawio": {
+      "title": "Agent-to-agent integration using MCP",
+      "family": "ra0029",
+      "level": "l2",
+      "domain": "agentic-ai",
+      "aliases": ["A2A MCP", "MCP agent integration", "agent to agent MCP"],
+      "tags": ["agentic", "a2a", "mcp", "agent", "tools", "joule"]
+    },
+    "ac_RA0029_AgenticAI_root.drawio": {
+      "title": "Agentic AI reference architecture",
+      "family": "ra0029",
+      "level": "l2",
+      "domain": "agentic-ai",
+      "aliases": ["Agentic AI", "agentic AI root", "AI agents architecture"],
+      "tags": ["agentic", "ai", "agent", "agents", "joule", "tools"]
+    },
+    "ac_RA0029_EmbodiedAIAgents.drawio": {
+      "title": "Embodied AI agents with SAP BTP",
+      "family": "ra0029",
+      "level": "l2",
+      "domain": "agentic-ai",
+      "aliases": ["Embodied AI agents", "robotic AI agents", "physical AI agents"],
+      "tags": ["embodied", "agentic", "ai", "agent", "agents", "robotics", "joule", "cloudconnector"]
+    },
+    "ac_RA0029_GenAI_ProCode.drawio": {
+      "title": "Generative AI for professional code development",
+      "family": "ra0029",
+      "level": "l2",
+      "domain": "agentic-ai",
+      "aliases": ["GenAI ProCode", "AI assisted pro-code development"],
+      "tags": ["genai", "procode", "developer", "agentic", "ai", "tools"]
+    },
+    "ac_RA0029_IntegrateAIAgentsWithJoule.drawio": {
+      "title": "Integrating AI agents with Joule",
+      "family": "ra0029",
+      "level": "l2",
+      "domain": "agentic-ai",
+      "aliases": ["integrate AI agents with Joule", "Joule agent integration"],
+      "tags": ["joule", "agentic", "ai", "agent", "tools"]
+    },
+    "ac_RA0029_JouleAgentsToolsEcosystem.drawio": {
+      "title": "Joule agents and tools ecosystem",
+      "family": "ra0029",
+      "level": "l2",
+      "domain": "agentic-ai",
+      "aliases": ["Joule agents tools ecosystem", "Joule tool ecosystem"],
+      "tags": ["joule", "agentic", "agent", "tools", "ecosystem"]
+    },
+    "btp_SAP_Build_Process_Automation_L2.drawio": {
+      "title": "SAP Build Process Automation L2",
+      "family": "btp",
+      "level": "l2",
+      "domain": "process",
+      "aliases": ["SAP Build Process Automation", "BPA L2", "process automation"],
+      "tags": ["process-automation", "workflow", "task", "build", "automation", "l2"]
+    },
+    "btp_SAP_Build_Work_Zone_L2.drawio": {
+      "title": "SAP Build Work Zone L2",
+      "family": "btp",
+      "level": "l2",
+      "domain": "experience",
+      "aliases": ["SAP Build Work Zone", "Work Zone L2"],
+      "tags": ["workzone", "build", "launchpad", "site", "experience", "l2"]
+    },
+    "btp_SAP_Cloud_Identity_Services_Authentication_L2.drawio": {
+      "title": "SAP Cloud Identity Services Authentication L2",
+      "family": "btp",
+      "level": "l2",
+      "domain": "identity",
+      "aliases": ["Cloud Identity Services Authentication", "IAS authentication", "Identity Authentication L2"],
+      "tags": ["identity", "authentication", "authn", "ias", "oauth", "oidc", "saml", "l2"]
+    },
+    "btp_SAP_Cloud_Identity_Services_Authentication_preset_L2.drawio": {
+      "title": "SAP Cloud Identity Services Authentication preset L2",
+      "family": "btp",
+      "level": "l2",
+      "domain": "identity",
+      "aliases": ["Cloud Identity Services Authentication preset", "IAS authentication preset"],
+      "tags": ["identity", "authentication", "authn", "ias", "preset", "oauth", "oidc", "saml", "l2"]
+    },
+    "btp_SAP_Cloud_Identity_Services_Authorization_L1.drawio": {
+      "title": "SAP Cloud Identity Services Authorization L1",
+      "family": "btp",
+      "level": "l1",
+      "domain": "identity",
+      "aliases": ["Cloud Identity Services Authorization", "authorization L1"],
+      "tags": ["identity", "authorization", "authz", "roles", "rbac", "l1"]
+    },
+    "btp_SAP_Cloud_Identity_Services_Identity_Lifecycle_L1.drawio": {
+      "title": "SAP Cloud Identity Services Identity Lifecycle L1",
+      "family": "btp",
+      "level": "l1",
+      "domain": "identity",
+      "aliases": ["Cloud Identity Services Identity Lifecycle", "identity lifecycle L1"],
+      "tags": ["identity", "lifecycle", "provisioning", "ias", "scim", "l1"]
+    },
+    "btp_SAP_Private_Link_Service_L2.drawio": {
+      "title": "SAP Private Link Service L2",
+      "family": "btp",
+      "level": "l2",
+      "domain": "networking",
+      "aliases": ["SAP Private Link Service", "Private Link L2"],
+      "tags": ["privatelink", "private-connectivity", "networking", "endpoint", "l2"]
+    },
+    "btp_SAP_Start_L2.drawio": {
+      "title": "SAP Start L2",
+      "family": "btp",
+      "level": "l2",
+      "domain": "experience",
+      "aliases": ["SAP Start", "SAP Start L2"],
+      "tags": ["start", "experience", "workzone", "entry-point", "l2"]
+    },
+    "btp_SAP_Task_Center_L0.drawio": {
+      "title": "SAP Task Center L0",
+      "family": "btp",
+      "level": "l0",
+      "domain": "process",
+      "aliases": ["SAP Task Center L0", "Task Center overview"],
+      "tags": ["taskcenter", "task", "inbox", "workflow", "l0"]
+    },
+    "btp_SAP_Task_Center_L1.drawio": {
+      "title": "SAP Task Center L1",
+      "family": "btp",
+      "level": "l1",
+      "domain": "process",
+      "aliases": ["SAP Task Center L1", "Task Center conceptual"],
+      "tags": ["taskcenter", "task", "inbox", "workflow", "l1"]
+    },
+    "btp_SAP_Task_Center_L2.drawio": {
+      "title": "SAP Task Center L2",
+      "family": "btp",
+      "level": "l2",
+      "domain": "process",
+      "aliases": ["SAP Task Center L2", "Task Center technical"],
+      "tags": ["taskcenter", "task", "inbox", "workflow", "l2"]
+    }
+  }
+}

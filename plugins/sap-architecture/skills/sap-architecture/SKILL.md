@@ -47,7 +47,7 @@ python3 .claude/skills/sap-architecture/scripts/select_reference.py --top 5 \
 
 Copy the closest bundled `.drawio` from `assets/reference-examples/` into the target location. **63 reference templates** are bundled, all Apache-2.0, sourced verbatim from `SAP/btp-solution-diagrams` (prefix `btp_`) and `SAP/architecture-center` (prefix `ac_`).
 
-Reference families now cover: Task Center, Build Work Zone, Build Process Automation, Cloud Identity Services / IAM, Private Link, Event-Driven Architecture, E2B connectivity, multi-region resiliency, Federated ML, hyperscaler data integration, Generative AI / RAG, A2A / MCP, Edge Integration Cell, Business Data Cloud, OData via App Router / CAP, B2B / A2A / API-managed integration, DevOps, Joule, SIEM/SOAR, SuccessFactors integration, and Agentic AI.
+Reference families now cover: Task Center, Build Work Zone, Build Process Automation, Cloud Identity Services / IAM, Private Link, Event-Driven Architecture, E2B connectivity, multi-region resiliency, Federated ML, hyperscaler data integration, Generative AI / RAG, A2A / MCP, Edge Integration Cell, Business Data Cloud, OData via App Router / CAP, B2B / A2A / API-managed integration, DevOps, Joule, SIEM/SOAR, SuccessFactors integration, and Agentic AI. The selector also reads `assets/reference-examples/template-metadata.json`, which gives every bundled template a curated title, domain, level, aliases, and scenario tags; trust those rankings over raw visible labels such as `Page-1`.
 
 **Selection guidance:**
 
@@ -191,6 +191,7 @@ sap-architecture/
 │   ├── reference-examples/        — 63 pristine SAP ref-arch templates (Apache-2.0)
 │   │                                 11 from SAP/btp-solution-diagrams (prefix btp_)
 │   │                                 52 from SAP/architecture-center (prefix ac_)
+│   │   └── template-metadata.json  — curated scenario titles, aliases, tags, domains, levels
 │   ├── icon-index.json            — slug → library label + ready-to-paste mxCell style
 │   ├── asset-index.json           — 448 SAP draw.io assets across 10 libraries
 │   └── NOTICE.md                  — Apache-2.0 attribution for SAP assets

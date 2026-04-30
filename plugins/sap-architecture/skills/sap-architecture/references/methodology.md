@@ -45,6 +45,7 @@ description ┐
 ┌──────────────────────────────────────────────────────────┐
 │ Step 1 — pick the closest reference template             │
 │   select_reference.py ranks 63 bundled SAP templates     │
+│   using metadata aliases/tags + visible draw.io labels   │
 └──────────────────────────────────────────────────────────┘
             │
             ▼
@@ -78,6 +79,8 @@ description ┐
             ▼
    final .drawio + flow narration
 ```
+
+For `eval_corpus.py run --exclude-target-template`, the exact target is removed from the selector pool. The harness therefore adds an explicit primary visual-neighbor hint computed with `compare.py` fingerprints. This is not used for normal production generation; it makes the leave-one-out research loop test the closest available SAP layout instead of an arbitrary semantic neighbor.
 
 ## Worked example — `examples/iam-arc1-mcp-l2.drawio`
 

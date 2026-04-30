@@ -9,7 +9,7 @@ Bundles:
 - **8 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, corpus findings, generation-quality checklist, and the comparison methodology — every value cited from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/) or observed in SAP's public corpus
 - **A validator** (`validate.py`) that catches bent arrows, clipped labels, off-palette colors, off-grid coordinates, duplicate ids, missing `labelBackgroundColor`, and XML comments
 - **An autofixer** (`autofix.py`) that mechanically repairs grid snap, hex case, missing `absoluteArcSize=1`, wrong `strokeWidth`, non-Helvetica fonts, and stray XML comments
-- **A template selector + comparison harness** (`select_reference.py`, `compare.py`, `score_corpus.py`) that picks the nearest SAP template, fingerprints a `.drawio`, and reports a 0-100 fidelity score — the empirical justification for the "always start from a template" workflow
+- **A metadata-aware template selector + comparison harness** (`select_reference.py`, `compare.py`, `score_corpus.py`) that picks the nearest SAP template, fingerprints a `.drawio`, and reports a 0-100 fidelity score — the empirical justification for the "always start from a template" workflow
 
 > **Why a dedicated skill?** Reproducing SAP Architecture Center style by hand or via a generic drawio skill consistently produces off-style output — wrong palette, bent `orthogonalEdgeStyle` arrows, clipped labels, text bleeding into `#EBF8FF` BTP fills, blank icon stencils (`shape=mxgraph.sap.icon;SAPIcon=…` doesn't render in many installs). This plugin bakes in the rules that matter and gates every output behind a validator.
 
@@ -172,7 +172,7 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/select_referenc
   "Joule agent calls S/4HANA through MCP and XSUAA"
 ```
 
-The selector ranks the 63 bundled templates by scenario family, level, filename matches, and visible labels in the draw.io file. Use it before editing XML.
+The selector ranks the 63 bundled templates by curated scenario metadata, family, level, filename matches, visible labels in the draw.io file, and strong aliases such as `DevOps`, `Edge Integration Cell`, `Federated ML`, `SuccessFactors`, `Joule`, `MCP`, and `Private Link`. Use it before editing XML.
 
 ### Score a diagram against a SAP reference
 
@@ -200,6 +200,8 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/score_corpus.py
 ### Run an Ollama-backed corpus evaluation loop
 
 `eval_corpus.py` orchestrates the longer feedback loop: inventory SAP references, extract diagram descriptions, ask a local model for a generation plan, create candidates, run `autofix.py` + `validate.py`, score against the specific target reference and the whole corpus, and write reports under `.cache/sap-architecture-eval/`. The default pass mode is target-aware; corpus-only scoring is still available with `--pass-mode corpus`.
+
+When `--exclude-target-template` is used, the harness now adds explicit "visual fallback" hints computed from the target reference fingerprint. That means the exact target cannot be copied, but the selected starting template is the closest available SAP layout. Add `--no-style-neighbor-hints` if you want a stricter pure-semantic leave-one-out selector test.
 
 Fast smoke checks:
 
@@ -237,7 +239,7 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py 
   --min-score 90
 ```
 
-Honest leave-one-out smoke, where the harness may not copy the target diagram:
+Leave-one-out smoke, where the harness may not copy the target diagram and uses the closest alternate SAP visual neighbor:
 
 ```bash
 python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py run \
@@ -246,6 +248,19 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py 
   --model qwen3.6:35b-a3b-nvfp4 \
   --exclude-target-template \
   --apply-model-plan \
+  --max-attempts 1 \
+  --min-score 90 \
+  --continue-on-error
+```
+
+Pure semantic leave-one-out, without target-derived visual-neighbor hints:
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py run \
+  --limit 3 \
+  --generator baseline \
+  --exclude-target-template \
+  --no-style-neighbor-hints \
   --max-attempts 1 \
   --min-score 90 \
   --continue-on-error
@@ -399,6 +414,7 @@ btp-drawio-skill/
                 ├── assets/
                 │   ├── libraries/         ← 10 SAP draw.io libraries (Apache-2.0)
                 │   ├── reference-examples/ ← 63 pristine SAP templates (Apache-2.0)
+                │   │   └── template-metadata.json ← curated selector aliases/tags
                 │   ├── icon-index.json    ← pre-computed slug→mxCell style lookup
                 │   ├── asset-index.json   ← 448 searchable SAP starter-kit assets
                 │   └── NOTICE.md          ← per-file Apache-2.0 attribution

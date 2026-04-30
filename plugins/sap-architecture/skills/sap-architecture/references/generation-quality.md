@@ -30,8 +30,9 @@ This checklist distills the research used to improve generated SAP BTP diagrams.
 
 ## Implementation consequences
 
-- `select_reference.py` prefers explicit reference families such as `RA0001` and preserves explicit L0/L1/L2 level hints.
+- `select_reference.py` prefers explicit reference families such as `RA0001`, preserves explicit L0/L1/L2 level hints, and reads curated `template-metadata.json` aliases/tags so generic labels like `Page-1` do not dominate selection.
 - `eval_corpus.py create` provides a direct description-to-diagram path for smoke tests and examples.
+- `eval_corpus.py run --exclude-target-template` now reports the nearest visual fallback templates computed from SAP fingerprints. These hints keep leave-one-out evaluation focused on visual fidelity when the exact target template is intentionally unavailable. Use `--no-style-neighbor-hints` for a pure semantic selector test.
 - The Ollama prompt now asks for protocols/flow semantics, target-audience consistency, and conservative template label replacements.
 - Model label edits do not rewrite reserved legend/notation labels such as `Access`, `Authentication`, `Authorization`, `Trust`, or `Deployment`.
 - Unguarded model replacements are limited to title/service labels or near-typo corrections, reducing semantic drift.

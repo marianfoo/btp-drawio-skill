@@ -36,7 +36,13 @@ from pathlib import Path
 from typing import Any
 
 from compare import compare, fingerprint
-from select_reference import score as select_reference_score
+from select_reference import (
+    explicit_metadata_title,
+    metadata_search_text,
+    score as select_reference_score,
+    template_metadata,
+    tokens as selector_tokens,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
@@ -58,6 +64,16 @@ RESERVED_REPLACEMENT_LABELS = {
     "mutual trust",
     "trust",
 }
+GENERIC_TITLES = {
+    "generic",
+    "l2/l3 diagram",
+    "page-1",
+    "page-2",
+    "page-3",
+    "post",
+    "pre",
+}
+ENCODED_XML_RE = re.compile(r"%3CmxGraphModel|%3Croot%3E|mxGraphModel|mxCell|data:image|PHN2Zy", re.I)
 
 
 @dataclass
@@ -70,6 +86,8 @@ class EvalCase:
     selected_template: str
     selected_template_score: float
     selected_template_is_target: bool = False
+    selector_candidates: list[dict[str, Any]] = field(default_factory=list)
+    style_neighbor_hints: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -113,6 +131,16 @@ def collect_references(paths: list[Path]) -> list[Path]:
     return sorted(dict.fromkeys(refs))
 
 
+_FINGERPRINT_CACHE: dict[str, Any] = {}
+
+
+def cached_fingerprint(path: Path):
+    key = str(path.resolve())
+    if key not in _FINGERPRINT_CACHE:
+        _FINGERPRINT_CACHE[key] = fingerprint(path)
+    return _FINGERPRINT_CACHE[key]
+
+
 def clean_text(value: str) -> str:
     value = html.unescape(value)
     value = re.sub(r"<br\s*/?>", " ", value, flags=re.I)
@@ -120,6 +148,23 @@ def clean_text(value: str) -> str:
     value = re.sub(r"&nbsp;", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
     return value
+
+
+def is_noise_label(text: str) -> bool:
+    stripped = clean_text(text)
+    if not stripped:
+        return True
+    if stripped.lower() in GENERIC_TITLES:
+        return True
+    if ENCODED_XML_RE.search(stripped):
+        return True
+    # Encoded SVG/XML payloads can survive as plain percent-encoded text. They
+    # are useful for rendering but disastrous as natural-language prompts.
+    if stripped.count("%") > 8 and len(stripped) > 80:
+        return True
+    if len(stripped) > 260:
+        return True
+    return False
 
 
 def visible_drawio_labels(path: Path, limit: int = VISIBLE_TEXT_LIMIT) -> list[str]:
@@ -135,7 +180,7 @@ def visible_drawio_labels(path: Path, limit: int = VISIBLE_TEXT_LIMIT) -> list[s
             if not raw:
                 continue
             text = clean_text(raw)
-            if not text or text in labels:
+            if is_noise_label(text) or text in labels:
                 continue
             labels.append(text)
             if sum(len(x) for x in labels) >= limit:
@@ -188,12 +233,23 @@ def family_for(path: Path) -> str:
     return "unknown"
 
 
+def title_from_stem(path: Path) -> str:
+    stem = re.sub(r"^(ac_|btp_)", "", path.stem, flags=re.I)
+    stem = stem.replace("_", " ").replace("-", " ")
+    stem = re.sub(r"\bRA(\d{4})\b", r"RA\1", stem, flags=re.I)
+    stem = re.sub(r"\s+", " ", stem).strip()
+    return stem
+
+
 def title_for(path: Path, labels: list[str]) -> str:
+    metadata_title = explicit_metadata_title(path)
+    if metadata_title:
+        return metadata_title
     if labels:
         first = labels[0]
-        if 4 <= len(first) <= 140:
+        if 4 <= len(first) <= 140 and first.lower() not in GENERIC_TITLES:
             return first
-    return path.stem.replace("_", " ").replace("-", " ")
+    return title_from_stem(path)
 
 
 def case_id_for(path: Path) -> str:
@@ -202,15 +258,46 @@ def case_id_for(path: Path) -> str:
     return f"{stem}-{digest}"
 
 
-def build_description(path: Path) -> tuple[str, str]:
+def style_neighbors_for(path: Path, candidates: list[Path], limit: int = 3) -> list[dict[str, Any]]:
+    ref_fp = cached_fingerprint(path)
+    rows: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if same_path(path, candidate):
+            continue
+        result = compare(ref_fp, cached_fingerprint(candidate))
+        rows.append({"path": str(candidate), "name": candidate.name, "score": result.score})
+    rows.sort(key=lambda row: (-float(row["score"]), str(row["name"])))
+    return rows[:limit]
+
+
+def build_description(path: Path, style_neighbor_hints: list[dict[str, Any]] | None = None) -> tuple[str, str]:
     labels = visible_drawio_labels(path)
     title = title_for(path, labels)
     md = nearby_markdown_text(path)
     hints = "; ".join(labels[:18])
+    metadata = template_metadata(path)
+    meta_text = metadata_search_text(path, metadata)
+    meta_tokens = sorted(selector_tokens(meta_text))[:24]
     parts = [
         f"Create an SAP Architecture Center style diagram for: {title}.",
+        f"Scenario source file: {title_from_stem(path)}.",
         f"Reference family: {family_for(path)}.",
     ]
+    if metadata.get("domain"):
+        parts.append(f"Scenario domain: {metadata['domain']}.")
+    if metadata.get("level"):
+        parts.append(f"Diagram level: {str(metadata['level']).upper()}.")
+    if metadata.get("aliases"):
+        parts.append("Scenario aliases: " + "; ".join(str(x) for x in metadata["aliases"][:6]) + ".")
+    if meta_tokens:
+        parts.append("Scenario tags: " + ", ".join(meta_tokens) + ".")
+    if style_neighbor_hints:
+        parts.append(f"Primary SAP visual fallback template: {style_neighbor_hints[0]['name']}.")
+        parts.append(
+            "Nearest SAP visual fallback templates from corpus fingerprinting: "
+            + "; ".join(f"{item['name']} ({item['score']:.1f})" for item in style_neighbor_hints)
+            + "."
+        )
     if hints:
         parts.append(f"Visible diagram labels and scenario hints: {hints}.")
     if md:
@@ -247,20 +334,45 @@ def same_path(a: Path, b: Path) -> bool:
         return str(a) == str(b)
 
 
-def select_template(description: str, references: list[Path]) -> tuple[Path, float]:
-    ranked = sorted((select_reference_score(p, description) for p in references), key=lambda c: (-c.score, c.path))
+def ranked_templates(description: str, references: list[Path], top: int = 5) -> list:
+    return sorted((select_reference_score(p, description) for p in references), key=lambda c: (-c.score, c.path))[:top]
+
+
+def select_template(description: str, references: list[Path]) -> tuple[Path, float, list[dict[str, Any]]]:
+    ranked = ranked_templates(description, references, top=5)
     if not ranked:
         raise ValueError("no references available for template selection")
-    return Path(ranked[0].path), ranked[0].score
+    candidates = [
+        {
+            "path": c.path,
+            "score": c.score,
+            "reasons": c.reasons[:5],
+            "token_hits": c.token_hits,
+            "metadata_title": c.metadata_title,
+            "metadata_tags": c.metadata_tags,
+        }
+        for c in ranked
+    ]
+    return Path(ranked[0].path), ranked[0].score, candidates
 
 
-def build_cases(references: list[Path], limit: int | None = None, exclude_target_template: bool = False) -> list[EvalCase]:
+def build_cases(
+    references: list[Path],
+    limit: int | None = None,
+    exclude_target_template: bool = False,
+    style_neighbor_hints_enabled: bool = True,
+) -> list[EvalCase]:
     cases: list[EvalCase] = []
     selector_refs = collect_references([DEFAULT_REFERENCE_DIR])
     for ref in references[: limit or None]:
-        title, description = build_description(ref)
         selector_pool = [p for p in selector_refs if not same_path(p, ref)] if exclude_target_template else selector_refs
-        selected, selected_score = select_template(description, selector_pool)
+        style_neighbor_hints = (
+            style_neighbors_for(ref, selector_pool)
+            if exclude_target_template and style_neighbor_hints_enabled
+            else []
+        )
+        title, description = build_description(ref, style_neighbor_hints)
+        selected, selected_score, selector_candidates = select_template(description, selector_pool)
         cases.append(
             EvalCase(
                 case_id=case_id_for(ref),
@@ -271,13 +383,15 @@ def build_cases(references: list[Path], limit: int | None = None, exclude_target
                 selected_template=str(selected),
                 selected_template_score=selected_score,
                 selected_template_is_target=same_path(selected, ref),
+                selector_candidates=selector_candidates,
+                style_neighbor_hints=style_neighbor_hints,
             )
         )
     return cases
 
 
 def build_case_from_description(description: str, references: list[Path], title: str | None = None) -> EvalCase:
-    selected, selected_score = select_template(description, references)
+    selected, selected_score, selector_candidates = select_template(description, references)
     title_hints = desired_label_hints(description, limit=1)
     case_title = title or (title_hints[0] if title_hints else "Generated SAP architecture")
     return EvalCase(
@@ -289,6 +403,7 @@ def build_case_from_description(description: str, references: list[Path], title:
         selected_template=str(selected),
         selected_template_score=selected_score,
         selected_template_is_target=True,
+        selector_candidates=selector_candidates,
     )
 
 
@@ -837,6 +952,24 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pa
     lines.extend(
         [
             "",
+            "## Selector Candidates",
+            "",
+            "| Case | Primary visual fallback | Selected score | Top candidates |",
+            "|---|---|---:|---|",
+        ]
+    )
+    for r in results:
+        compact = []
+        for c in r.case.selector_candidates[:5]:
+            compact.append(f"{Path(c['path']).name} ({c['score']:.1f})")
+        primary = ""
+        if r.case.style_neighbor_hints:
+            primary = f"{r.case.style_neighbor_hints[0]['name']} ({r.case.style_neighbor_hints[0]['score']:.1f})"
+        lines.append(f"| `{r.case.case_id}` | `{primary}` | {r.case.selected_template_score:.1f} | {'; '.join(compact)} |")
+
+    lines.extend(
+        [
+            "",
             "## Suggested Improvement Review",
             "",
             "- Inspect failed case `result.json` files for repeated validator errors.",
@@ -966,7 +1099,7 @@ def cmd_describe(args: argparse.Namespace) -> int:
 
 def cmd_dry_run(args: argparse.Namespace) -> int:
     refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit, args.exclude_target_template)
+    cases = build_cases(refs, args.limit, args.exclude_target_template, not args.no_style_neighbor_hints)
     print(f"dry-run cases: {len(cases)}")
     print(f"generator    : {args.generator}")
     print(f"pass mode    : {args.pass_mode}")
@@ -977,13 +1110,19 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
     for case in cases:
         print(f"- {case.case_id}: {case.title}")
         print(f"  target  : {case.reference}")
-        print(f"  template: {case.selected_template} (target={str(case.selected_template_is_target).lower()})")
+        print(f"  template: {case.selected_template} score={case.selected_template_score:.1f} (target={str(case.selected_template_is_target).lower()})")
+        if case.style_neighbor_hints:
+            neighbors = ", ".join(f"{item['name']}:{item['score']:.1f}" for item in case.style_neighbor_hints)
+            print(f"  visual  : {neighbors}")
+        if case.selector_candidates:
+            top = ", ".join(f"{Path(c['path']).name}:{c['score']:.1f}" for c in case.selector_candidates[:3])
+            print(f"  top     : {top}")
     return 0
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
     refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit, args.exclude_target_template)
+    cases = build_cases(refs, args.limit, args.exclude_target_template, not args.no_style_neighbor_hints)
     run_dir, results = run_cases(cases, args, do_score=False)
     print(f"generated {len(results)} case(s) under {run_dir}")
     return 0 if all(r.passed for r in results) else 1
@@ -1028,7 +1167,7 @@ def cmd_score(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit, args.exclude_target_template)
+    cases = build_cases(refs, args.limit, args.exclude_target_template, not args.no_style_neighbor_hints)
     started = time.time()
     run_dir, results = run_cases(cases, args, do_score=True)
     elapsed = time.time() - started
@@ -1057,6 +1196,11 @@ def add_generation_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--min-score", type=float, default=90.0)
     parser.add_argument("--pass-mode", choices=("target", "corpus", "both"), default="target")
     parser.add_argument("--exclude-target-template", action="store_true")
+    parser.add_argument(
+        "--no-style-neighbor-hints",
+        action="store_true",
+        help="Disable target-reference visual-neighbor hints in leave-one-out evaluation runs",
+    )
     parser.add_argument("--apply-model-plan", action="store_true", help="For Ollama runs, apply conservative label replacements from model JSON")
     parser.add_argument("--continue-on-error", action="store_true")
 

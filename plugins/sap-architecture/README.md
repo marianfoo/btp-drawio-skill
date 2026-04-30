@@ -33,6 +33,7 @@ sap-architecture/
         │   ├── reference-examples/        — 63 pristine SAP templates
         │   │                                  11 from SAP/btp-solution-diagrams (btp_)
         │   │                                  52 from SAP/architecture-center (ac_)
+        │   │   └── template-metadata.json — curated scenario titles, aliases, tags, levels
         │   ├── icon-index.json            — pre-computed slug → mxCell style lookup
         │   ├── asset-index.json           — 448 searchable SAP draw.io assets
         │   └── NOTICE.md                  — per-file SAP attribution (Apache-2.0)
@@ -84,13 +85,13 @@ All scripts use only the Python standard library — zero pip install required.
 |---|---|
 | `extract_icon.py "<name>"` | Fuzzy-lookup a BTP service icon; emit ready-to-paste `<mxCell>` with grid-snapped geometry. Supports abbreviations (XSUAA, CPI, HANA, CC, IAS, IPS, CAP, CF). `--list` shows all 100. |
 | `extract_asset.py "<name>" --kind <kind>` | Fuzzy-lookup any indexed SAP starter-kit asset: generic icons, connectors, area/default shapes, essentials, number markers, brand names, text elements, annotations/interfaces, and BTP service icons. |
-| `select_reference.py "<request>"` | Rank bundled SAP templates for a natural-language request. Use before editing XML. |
+| `select_reference.py "<request>"` | Rank bundled SAP templates for a natural-language request using curated metadata, filenames, aliases, levels, and visible labels. Use before editing XML. |
 | `validate.py <file>` | Structural + style validator. Catches bent arrows, text overflow, off-palette, off-grid, duplicate ids, sibling overlap, missing `labelBackgroundColor`. `--strict` turns warnings into errors. `--json` for machine-readable output. |
 | `autofix.py --write <file>` | Mechanical fixer: grid snap, hex case, `absoluteArcSize=1`, `strokeWidth` rounding, `fontFamily`→Helvetica. Writes a `.bak` backup. |
 | `compare.py <reference> <candidate>` | Pairwise structural/style/content fingerprint score. |
 | `score_corpus.py <candidate>` | Score a candidate against all bundled references; `--min-score 90` makes it a gate. |
 | `eval_corpus.py create "..."` | Create one diagram from a natural-language description, optionally with Ollama planning and model-plan label application. |
-| `eval_corpus.py run --generator ollama` | Opt-in target-aware corpus loop for local Ollama experiments. Use `--exclude-target-template` for honest leave-one-out tests. Writes candidates and reports under `.cache/sap-architecture-eval/`. |
+| `eval_corpus.py run --generator ollama` | Opt-in target-aware corpus loop for local Ollama experiments. Use `--exclude-target-template` to prevent copying the target; the harness then uses closest visual-neighbor hints unless `--no-style-neighbor-hints` is set. Writes candidates and reports under `.cache/sap-architecture-eval/`. |
 | `build_icon_index.py` | Re-parse the BTP service icon library into `assets/icon-index.json`. Run after refreshing the library from SAP upstream. |
 | `build_asset_index.py` | Re-parse all bundled SAP draw.io libraries into `assets/asset-index.json`. |
 | `check_asset_coverage.py` | Smoke-check library presence, index counts, SAP Build coverage, and official SAP preset colors. |
