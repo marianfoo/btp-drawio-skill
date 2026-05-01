@@ -189,6 +189,7 @@ sap-architecture/
 │   ├── layout.md                  — canvas skeleton + zone-by-zone placement
 │   ├── do-and-dont.md             — consolidated SAP rules with verbatim quotes
 │   ├── generation-quality.md      — research-backed output checklist
+│   ├── external-test-corpus.md    — optional external SAP corpus for evaluation
 │   └── corpus-findings.md         — 2026 corpus profile from SAP's public repos
 ├── assets/
 │   ├── libraries/

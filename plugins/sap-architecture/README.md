@@ -27,6 +27,7 @@ sap-architecture/
         │   ├── do-and-dont.md             — consolidated SAP rules with verbatim quotes
         │   ├── corpus-findings.md         — 2026 SAP corpus profile
         │   ├── generation-quality.md      — research-backed output checklist
+        │   ├── external-test-corpus.md    — optional external SAP corpus for longer runs
         │   └── methodology.md             — comparison harness, fidelity claim
         ├── assets/
         │   ├── libraries/                 — 10 SAP draw.io starter-kit libraries

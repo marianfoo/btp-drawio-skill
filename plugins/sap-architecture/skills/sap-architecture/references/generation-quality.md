@@ -37,6 +37,7 @@ This checklist distills the research used to improve generated SAP BTP diagrams.
 - `eval_corpus.py run --exclude-target-template` now reports the nearest visual fallback templates computed from SAP fingerprints. These hints keep leave-one-out evaluation focused on visual fidelity when the exact target template is intentionally unavailable. Use `--no-style-neighbor-hints` for a pure semantic selector test.
 - Overnight runs classify failures into `near-miss` and `ceiling-limited`. A ceiling-limited case means the chosen alternate SAP template is structurally too far from the target; add a closer sibling template or improve geometry-aware generation instead of spending more model attempts.
 - Use the default `--retry-margin 8` for long local runs. With `--min-score 90`, it retries only cases that already score 82+ and stops early on low-ceiling cases.
+- Use `references/external-test-corpus.md` for the second-stage external SAP run. The older `SAP/sap-btp-reference-architectures` diagrams are useful stress cases because they cover legacy and methodology-driven layouts that are not all visually close to the bundled templates.
 - The Ollama prompt now asks for protocols/flow semantics, target-audience consistency, and conservative template label replacements.
 - Model label edits do not rewrite reserved legend/notation labels such as `Access`, `Authentication`, `Authorization`, `Trust`, or `Deployment`.
 - Unguarded model replacements are limited to title/service labels or near-typo corrections, reducing semantic drift.

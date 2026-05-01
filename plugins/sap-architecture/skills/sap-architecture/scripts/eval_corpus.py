@@ -66,12 +66,19 @@ RESERVED_REPLACEMENT_LABELS = {
 }
 GENERIC_TITLES = {
     "generic",
+    "btp service",
+    "btp services",
     "l2/l3 diagram",
+    "multi-cloud",
+    "network",
     "page-1",
     "page-2",
     "page-3",
+    "sap btp",
     "post",
     "pre",
+    "without logo",
+    "without logos",
 }
 ENCODED_XML_RE = re.compile(r"%3CmxGraphModel|%3Croot%3E|mxGraphModel|mxCell|data:image|PHN2Zy", re.I)
 
@@ -158,6 +165,12 @@ def is_noise_label(text: str) -> bool:
     if not stripped:
         return True
     if stripped.lower() in GENERIC_TITLES:
+        return True
+    if not re.search(r"[A-Za-z]", stripped):
+        return True
+    if re.fullmatch(r"[\"'`> <]+", stripped):
+        return True
+    if re.fullmatch(r"\d{5,8}", stripped):
         return True
     if ENCODED_XML_RE.search(stripped):
         return True
@@ -248,6 +261,11 @@ def title_for(path: Path, labels: list[str]) -> str:
     metadata_title = explicit_metadata_title(path)
     if metadata_title:
         return metadata_title
+    # External SAP reference repositories often have generic first labels such
+    # as "Subaccount" or "Network". Their filenames are usually better scenario
+    # titles than the first visible mxCell label.
+    if not re.match(r"^(ac_|btp_)", path.name, flags=re.I):
+        return title_from_stem(path)
     if labels:
         first = labels[0]
         if 4 <= len(first) <= 140 and first.lower() not in GENERIC_TITLES:

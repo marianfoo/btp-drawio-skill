@@ -6,7 +6,7 @@ Bundles:
 - **100 SAP BTP service icons** (inline SVG data URIs, grey-background-circle variant — the one [SAP mandates](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/icons.md) for diagrams)
 - **448 indexed SAP draw.io starter-kit assets** across 10 bundled libraries: BTP service icons, generic icons, connector presets, area/default shapes, essential shapes, number markers, SAP brand-name text, text elements, and annotation/interface pills
 - **63 pristine reference templates** (Apache-2.0): all 11 canonical examples from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams) plus 52 curated reference architectures from [`SAP/architecture-center`](https://github.com/SAP/architecture-center), covering IAM, Joule, MCP / Agentic AI, multitenant SaaS, DevOps, Private Link, Event-Driven Architecture, resiliency, Business Data Cloud, integration, SIEM/SOAR, and SuccessFactors
-- **8 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, corpus findings, generation-quality checklist, and the comparison methodology — every value cited from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/) or observed in SAP's public corpus
+- **9 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, corpus findings, generation-quality checklist, external-corpus guidance, and the comparison methodology — every value cited from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/) or observed in SAP's public corpus
 - **A validator** (`validate.py`) that catches bent arrows, clipped labels, off-palette colors, off-grid coordinates, duplicate ids, missing `labelBackgroundColor`, and XML comments
 - **An autofixer** (`autofix.py`) that mechanically repairs grid snap, hex case, missing `absoluteArcSize=1`, wrong `strokeWidth`, non-Helvetica fonts, and stray XML comments
 - **A metadata-aware template selector + comparison harness** (`select_reference.py`, `compare.py`, `score_corpus.py`) that picks the nearest SAP template, fingerprints a `.drawio`, and reports a 0-100 fidelity score — the empirical justification for the "always start from a template" workflow
@@ -287,6 +287,8 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py 
 
 Generated candidates, raw model output, `summary.json`, and `report.md` are written below `.cache/` and are intentionally untracked. Curate any useful examples into the repo only after reviewing them.
 
+Optional external SAP corpus: clone [`SAP/sap-btp-reference-architectures`](https://github.com/SAP/sap-btp-reference-architectures) under `.cache/external/` and run `eval_corpus.py --references .cache/external/sap-btp-reference-architectures ...` after the bundled run. That Apache-2.0 repository adds 32 editable `.drawio` test targets, including older BTP reference architectures that are intentionally harder than the bundled corpus. See [`references/external-test-corpus.md`](plugins/sap-architecture/skills/sap-architecture/references/external-test-corpus.md).
+
 ### Validate an existing `.drawio`
 
 ```bash
@@ -416,6 +418,7 @@ btp-drawio-skill/
                 │   ├── do-and-dont.md     ← consolidated SAP rules (verbatim quotes)
                 │   ├── corpus-findings.md ← 2026 SAP corpus profile
                 │   ├── generation-quality.md ← research-backed output checklist
+                │   ├── external-test-corpus.md ← optional external SAP corpus
                 │   └── methodology.md     ← comparison harness, fidelity claim
                 ├── assets/
                 │   ├── libraries/         ← 10 SAP draw.io libraries (Apache-2.0)
