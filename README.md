@@ -205,6 +205,20 @@ When `--exclude-target-template` is used, the harness now adds explicit "visual 
 
 The report now separates `near-miss` cases from `ceiling-limited` cases. Near misses are worth retrying; ceiling-limited cases need better sibling templates or geometry-aware generation because the selected alternate SAP layout is already too far below the target. The default `--retry-margin 8` only retries cases scoring 82+ when `--min-score 90`, which avoids wasting long Ollama runs on structurally impossible cases. Use `--retry-margin 100` only when you deliberately want the old exhaustive behavior.
 
+After a full run, focus only on the cases that can still benefit from more model attempts:
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py dry-run \
+  --from-run .cache/sap-architecture-eval/<run-id> \
+  --case-class near-miss \
+  --generator ollama \
+  --model qwen3.6:35b-a3b-nvfp4 \
+  --exclude-target-template \
+  --apply-model-plan
+```
+
+Use `--case-id <substring>` for manual family tests, for example `--case-id ra0024`, `--case-id agenticai`, or `--case-id cloudconnector`.
+
 Fast smoke checks:
 
 ```bash
@@ -280,6 +294,23 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py 
   --apply-model-plan \
   --max-attempts 3 \
   --retry-margin 8 \
+  --min-score 90 \
+  --timeout-seconds 1200 \
+  --continue-on-error
+```
+
+Focused near-miss retry after a previous run:
+
+```bash
+python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py run \
+  --from-run .cache/sap-architecture-eval/<run-id> \
+  --case-class near-miss \
+  --generator ollama \
+  --model qwen3.6:35b-a3b-nvfp4 \
+  --exclude-target-template \
+  --apply-model-plan \
+  --max-attempts 5 \
+  --retry-margin 100 \
   --min-score 90 \
   --timeout-seconds 1200 \
   --continue-on-error

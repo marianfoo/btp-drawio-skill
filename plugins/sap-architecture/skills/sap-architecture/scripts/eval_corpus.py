@@ -445,6 +445,93 @@ def build_cases(
     return cases
 
 
+def best_attempt_dict(result: dict[str, Any]) -> dict[str, Any] | None:
+    attempts = result.get("attempts") or []
+    if not attempts:
+        return None
+    return max(attempts, key=lambda a: a.get("pass_score") or 0.0)
+
+
+def classify_result_dict(result: dict[str, Any], min_score: float, retry_margin: float) -> str:
+    if result.get("passed"):
+        return "passed"
+    attempt = best_attempt_dict(result)
+    if attempt is None:
+        return "not-run"
+    if attempt.get("model_error") and attempt.get("pass_score") is None:
+        return "model-failure"
+    if attempt.get("validate_errors"):
+        return "validator-failure"
+    if float(result.get("best_score") or 0.0) >= min_score - retry_margin:
+        return "near-miss"
+    return "ceiling-limited"
+
+
+def load_run_summary(path: Path) -> dict[str, Any]:
+    summary = path if path.name == "summary.json" else path / "summary.json"
+    if not summary.exists():
+        raise ValueError(f"{summary}: run summary not found")
+    return json.loads(summary.read_text(encoding="utf-8"))
+
+
+def selected_case_ids_from_run(args: argparse.Namespace) -> set[str] | None:
+    classes = set(getattr(args, "case_class", None) or [])
+    run_path = getattr(args, "from_run", None)
+    if not run_path:
+        if classes:
+            raise ValueError("--case-class requires --from-run")
+        return None
+    summary = load_run_summary(run_path)
+    summary_min_score = summary.get("min_score")
+    summary_retry_margin = summary.get("retry_margin")
+    min_score = float(summary_min_score if summary_min_score is not None else getattr(args, "min_score", 90.0))
+    retry_margin = float(summary_retry_margin if summary_retry_margin is not None else getattr(args, "retry_margin", 8.0))
+    selected: set[str] = set()
+    for result in summary.get("results", []):
+        case_id = result.get("case", {}).get("case_id")
+        if not case_id:
+            continue
+        classification = classify_result_dict(result, min_score, retry_margin)
+        failed = classification != "passed"
+        if not classes or classification in classes or ("failed" in classes and failed):
+            selected.add(case_id)
+    return selected
+
+
+def case_matches_queries(case: EvalCase, queries: list[str]) -> bool:
+    haystack = " ".join(
+        [
+            case.case_id,
+            case.family,
+            case.title,
+            Path(case.reference).name,
+        ]
+    ).lower()
+    return all(query.lower() in haystack for query in queries)
+
+
+def generation_case_filters_enabled(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "case_id", None) or getattr(args, "case_class", None) or getattr(args, "from_run", None))
+
+
+def build_generation_cases(args: argparse.Namespace) -> list[EvalCase]:
+    refs = collect_references(default_reference_inputs(args))
+    prefilter_limit = None if generation_case_filters_enabled(args) else args.limit
+    cases = build_cases(refs, prefilter_limit, args.exclude_target_template, not args.no_style_neighbor_hints)
+
+    selected_ids = selected_case_ids_from_run(args)
+    if selected_ids is not None:
+        cases = [case for case in cases if case.case_id in selected_ids]
+
+    queries = getattr(args, "case_id", None) or []
+    if queries:
+        cases = [case for case in cases if case_matches_queries(case, queries)]
+
+    if generation_case_filters_enabled(args) and args.limit is not None:
+        cases = cases[: args.limit]
+    return cases
+
+
 def build_case_from_description(description: str, references: list[Path], title: str | None = None) -> EvalCase:
     selected, selected_score, selector_candidates = select_template(description, references)
     title_hints = desired_label_hints(description, limit=1)
@@ -1427,14 +1514,23 @@ def cmd_describe(args: argparse.Namespace) -> int:
 
 
 def cmd_dry_run(args: argparse.Namespace) -> int:
-    refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit, args.exclude_target_template, not args.no_style_neighbor_hints)
+    try:
+        cases = build_generation_cases(args)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     print(f"dry-run cases: {len(cases)}")
     print(f"generator    : {args.generator}")
     print(f"pass mode    : {args.pass_mode}")
     print(f"retry margin : {args.retry_margin}")
     print(f"exclude target template: {str(args.exclude_target_template).lower()}")
     print(f"apply model plan: {str(args.apply_model_plan).lower()}")
+    if args.from_run:
+        print(f"from run     : {args.from_run}")
+    if args.case_class:
+        print(f"case classes : {', '.join(args.case_class)}")
+    if args.case_id:
+        print(f"case filters : {', '.join(args.case_id)}")
     if args.generator == "ollama":
         print(f"model        : {args.model}")
         print(f"endpoint     : {args.ollama_endpoint}")
@@ -1455,8 +1551,11 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
-    refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit, args.exclude_target_template, not args.no_style_neighbor_hints)
+    try:
+        cases = build_generation_cases(args)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     run_dir, results = run_cases(cases, args, do_score=False)
     print(f"generated {len(results)} case(s) under {run_dir}")
     return 0 if all(r.passed for r in results) else 1
@@ -1500,8 +1599,11 @@ def cmd_score(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    refs = collect_references(default_reference_inputs(args))
-    cases = build_cases(refs, args.limit, args.exclude_target_template, not args.no_style_neighbor_hints)
+    try:
+        cases = build_generation_cases(args)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     started = time.time()
     run_dir, results = run_cases(cases, args, do_score=True)
     elapsed = time.time() - started
@@ -1552,6 +1654,23 @@ def add_generation_args(parser: argparse.ArgumentParser) -> None:
         help="Disable target-reference visual-neighbor hints in leave-one-out evaluation runs",
     )
     parser.add_argument("--apply-model-plan", action="store_true", help="For Ollama runs, apply conservative label replacements from model JSON")
+    parser.add_argument(
+        "--from-run",
+        type=Path,
+        help="Previous eval run directory or summary.json used to select cases for a focused rerun",
+    )
+    parser.add_argument(
+        "--case-class",
+        action="append",
+        choices=("passed", "failed", "near-miss", "ceiling-limited", "model-failure", "validator-failure", "not-run"),
+        help="Rerun only cases with this class in --from-run. Repeat for multiple classes.",
+    )
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        default=None,
+        help="Filter cases by substring across case id, family, title, or reference filename. Repeat to narrow further.",
+    )
     parser.add_argument("--continue-on-error", action="store_true")
 
 

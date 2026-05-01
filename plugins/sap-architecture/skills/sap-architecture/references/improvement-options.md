@@ -136,8 +136,9 @@ Why it is low value: the Apache-2.0 diagram corpus is useful but small, and the 
 ## Recommended improvement order
 
 1. Run the bundled leave-one-out suite with structured Ollama output and feedback retries.
-2. Review near-misses first; convert recurring label/selector failures into metadata or prompt changes.
-3. Review ceiling-limited cases second; add legally compatible SAP templates or improve visual-neighbor selection.
-4. Run the external SAP corpus only after bundled results stabilize.
-5. Add semantic validation rules for SAP AI/Joule/MCP once visual fidelity is consistently high.
-6. Add screenshot QA for curated examples and release checks.
+2. Rerun only near-misses with `--from-run <run-dir> --case-class near-miss`; this is the only group where extra model attempts are currently likely to help.
+3. Review ceiling-limited cases second; add legally compatible SAP templates or improve visual-neighbor selection instead of spending more Ollama attempts.
+4. Convert recurring label/selector failures into metadata, prompt rules, or curated template aliases.
+5. Run the external SAP corpus only after bundled results stabilize.
+6. Add semantic validation rules for SAP AI/Joule/MCP once visual fidelity is consistently high.
+7. Add screenshot QA for curated examples and release checks.

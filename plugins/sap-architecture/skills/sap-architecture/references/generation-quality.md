@@ -45,4 +45,6 @@ This checklist distills the research used to improve generated SAP BTP diagrams.
 - Per-attempt `target-compare.json` and `best-corpus-compare.json` files explain why a candidate did or did not match the target.
 - Ollama runs use `/api/generate` with a JSON schema by default, temperature `0`, and CLI fallback if the local API is unavailable. This follows Ollama's structured-output guidance and keeps long runs machine-consumable.
 - Retry attempts now receive compact score feedback from the previous attempt: validator counts, weak fingerprint dimensions, target diffs, and rejected label replacements. This makes second/third attempts useful for near-miss cases while leaving low-ceiling template gaps for human/template review.
+- Use `--from-run <run-dir> --case-class near-miss` for focused retry runs. Re-running the full corpus after a stable `22/63` result wastes time on ceiling-limited cases whose alternate template is structurally too far from the target.
+- Use `--case-id <substring>` for manual smoke tests against one architecture family, for example `--case-id ra0024` for Joule/IAM or `--case-id agenticai` for Agentic AI.
 - See `references/improvement-options.md` for the researched option ranking and why direct XML generation, generic autolayout, and fine-tuning are not the best next moves for SAP-style fidelity.
