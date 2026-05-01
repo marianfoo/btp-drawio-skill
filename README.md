@@ -373,13 +373,16 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/check_asset_cov
 
 ## What the skill does — workflow
 
+The skill is an **authoring assistant**, not a one-shot generator. The realistic workflow takes 15-30 min per diagram; ~⅓ of scenarios pass the corpus loop without manual editing, the remaining ⅔ need surgical edits in draw.io desktop. See [`references/manual-workflow.md`](plugins/sap-architecture/skills/sap-architecture/references/manual-workflow.md) for the time-budget table and the full loop.
+
 When triggered, the skill runs a 6-step pipeline (documented in full in [`plugins/sap-architecture/skills/sap-architecture/SKILL.md`](plugins/sap-architecture/skills/sap-architecture/SKILL.md)):
 
 1. **Parse → plan** — infer level (L0/L1/L2, default L2), zones, services, numbered flow steps, and which service is the "star" (accent color).
-2. **Scaffold from a SAP reference template — MANDATORY** — run `scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks the 63 bundled SAP templates against the request, copies the best match to the destination, and prints alternates. The single most common cause of bad diagrams is the LLM trying to write XML from scratch — `scaffold_diagram.py` removes that temptation.
+2. **Scaffold from a SAP reference template — MANDATORY** — run `scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks the 63 bundled SAP templates against the request, copies the best match to the destination, and prints alternates. The single most common cause of bad diagrams is the LLM trying to write XML from scratch — `scaffold_diagram.py` removes that temptation. Use `template_browser.py` (pre-rendered thumbnail gallery of all 63) when picking visually is faster than reading filenames.
 3. **Place BTP service icons** — fuzzy-lookup each service via `extract_icon.py`, which emits an `<mxCell>` with the official inline-SVG data URI and grid-snapped geometry.
-4. **Surgical relabel** — change labels, swap services, add a few cards next to the existing ones. **Preserve canvas size, zone hierarchy, network divider, SAP logos, footer, and identity flow.** Reference docs: `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`, `do-and-dont.md`.
-5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (now catches dark page backgrounds, novelty pill verbs like PROMPT/ROUTE/CONTEXT/DELEGATE, multi-logo over-use), then `score_corpus.py --min-score 90`. Evaluation runs also score against the specific target reference; the skill doesn't hand you a diagram until validation passes and the score is close to SAP's templates.
+4. **Surgical relabel** — change labels, swap services, add a few cards next to the existing ones. **Preserve canvas size, zone hierarchy, network divider, SAP logos, footer, and identity flow.** For complex scenarios that need more than relabeling, open the file in draw.io desktop and edit directly. Reference docs: `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`, `do-and-dont.md`, `manual-workflow.md`.
+5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (now catches dark page backgrounds, novelty pill verbs like PROMPT/ROUTE/CONTEXT/DELEGATE, multi-logo over-use), then `score_corpus.py --min-score 90`.
+5b. **Visual review (the missing last 20%)** — `render_compare.py <ref>.drawio <cand>.drawio --open` builds an HTML page with side-by-side rendered PNGs, structural score breakdown, and **actionable suggestions mapped to the lowest-scoring fingerprint dimensions**. The fingerprint score is necessary but insufficient; the visual review catches what XML diffing can't.
 6. **Narrate the flow** — print a numbered list explaining what each pill means, for pasting below the embedded image in Markdown / Confluence.
 
 ---

@@ -51,6 +51,9 @@ sap-architecture/
             ├── autofix.py                 — mechanical fixes
             ├── scaffold_diagram.py        — copy the closest SAP template (mandatory first step)
             ├── select_reference.py        — prompt → ranked SAP templates
+            ├── template_browser.py        — pre-render all 63 templates into a thumbnail gallery
+            ├── render.py                  — drawio CLI wrapper (export to PNG/SVG/PDF)
+            ├── render_compare.py          — render candidate + reference + side-by-side HTML review
             ├── compare.py                 — pairwise fingerprint score vs SAP refs
             ├── score_corpus.py            — best score across the reference corpus
             └── eval_corpus.py             — smoke-first Ollama corpus evaluation loop
@@ -89,6 +92,9 @@ All scripts use only the Python standard library — zero pip install required.
 | `extract_icon.py "<name>"` | Fuzzy-lookup a BTP service icon; emit ready-to-paste `<mxCell>` with grid-snapped geometry. Supports abbreviations (XSUAA, CPI, HANA, CC, IAS, IPS, CAP, CF). `--list` shows all 100. |
 | `extract_asset.py "<name>" --kind <kind>` | Fuzzy-lookup any indexed SAP starter-kit asset: generic icons, connectors, area/default shapes, essentials, number markers, brand names, text elements, annotations/interfaces, and BTP service icons. |
 | `scaffold_diagram.py "<request>" --out <file>` | Copy the closest SAP reference template to a destination so editing starts from a pristine SAP-style file. Supports `--template` for an explicit pick, `--dry-run` to inspect candidates, and `--diagram-name` to rename the page. **The mandatory first step of the skill.** |
+| `render.py <file>.drawio` | Render a `.drawio` file to PNG/SVG/PDF via the draw.io desktop CLI. Auto-discovers the binary on macOS, Linux, WSL2; honor `$DRAWIO_CLI` to override. `--batch <dir>` renders every diagram in a folder. |
+| `render_compare.py <ref>.drawio <cand>.drawio --open` | Render both files to PNG and emit `review.html` with side-by-side images, structural score breakdown, and **actionable suggestions mapped to the lowest-scoring fingerprint dimensions**. The fastest visual review for the manual-iteration loop. |
+| `template_browser.py` | Pre-render all 63 bundled SAP templates into a thumbnail gallery with filter, domain badges, and the exact `scaffold_diagram.py --template …` command for each. Useful when you need to pick the right starting template visually. |
 | `select_reference.py "<request>"` | Rank bundled SAP templates for a natural-language request using curated metadata, filenames, aliases, levels, and visible labels. Use before editing XML. |
 | `validate.py <file>` | Structural + style validator. Catches bent arrows, text overflow, off-palette, off-grid, duplicate ids, sibling overlap, missing `labelBackgroundColor`. `--strict` turns warnings into errors. `--json` for machine-readable output. |
 | `autofix.py --write <file>` | Mechanical fixer: grid snap, hex case, `absoluteArcSize=1`, `strokeWidth` rounding, `fontFamily`→Helvetica. Writes a `.bak` backup. |

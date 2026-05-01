@@ -118,9 +118,20 @@ python3 .claude/skills/sap-architecture/scripts/extract_asset.py "devices non sa
 
 Prefer these library assets over hand-authored arrows, number bubbles, interface pills, generic device/user icons, or product-name text. SAP explicitly provides these custom draw.io libraries as the starter kit; matching them is higher fidelity than recreating the shapes by style string.
 
-### 4. Compose the XML
+### 4. Surgical relabel — preserve the template, change only what differs
 
-Build the full `.drawio` file following these references (every value cited back to the SAP guideline):
+You scaffolded from a SAP template in step 2. Now make the *minimum* edits required for the user's scenario:
+
+- Rename the diagram title and zone labels.
+- Swap service-card labels (use exact SAP product names: "SAP S/4HANA Cloud", not "S/4HANA").
+- Add or swap icons via `extract_icon.py` / `extract_asset.py`.
+- Adjust connector source/target if you swapped services.
+
+**Do NOT touch:** canvas size, zone hierarchy (e.g. don't nest Joule inside BTP if the reference puts them side by side), network divider, SAP logos, footer band, identity-flow placement. Those carry the SAP visual identity; preserving them is what keeps the score above 90.
+
+For complex scenarios that require more than label edits — **stop and edit in draw.io desktop instead.** The realistic last 20% of polish requires a visual editor; see `references/manual-workflow.md` for the time-budget table per scenario complexity.
+
+Reference docs (every value cited back to the SAP guideline):
 
 - `references/levels.md` — L0 / L1 / L2 audience definitions + canvas conventions
 - `references/layout.md` — canvas skeleton, zones, title band, network bar
@@ -179,16 +190,39 @@ python3 .claude/skills/sap-architecture/scripts/score_corpus.py --min-score 90 m
 
 For extra research runs, clone `SAP/btp-solution-diagrams` and `SAP/architecture-center`, then pass those directories to `score_corpus.py --references <dir>`. This lets you compare against SAP's full live corpus without bundling every upstream file in the plugin.
 
-### 6. Export (if requested) + narrate the flow
+### 5b. Visual review — the missing piece for the last 20%
 
-If the user asked for a PNG/SVG/PDF, export with:
+The fingerprint score is necessary but not sufficient. Two diagrams can have identical fingerprints yet look very different. For the last-mile polish, render both candidate and reference to PNG and review them side by side:
 
 ```bash
-"/Applications/draw.io.app/Contents/MacOS/draw.io" -x -f png -e -b 10 -s 2 \
-  -o my-diagram.drawio.png my-diagram.drawio
+python3 .claude/skills/sap-architecture/scripts/render_compare.py \
+  assets/reference-examples/<the-template-you-scaffolded-from>.drawio \
+  my-diagram.drawio \
+  --out-dir .cache/review/my-scenario/ \
+  --open
 ```
 
-(`drawio` binary on Linux, `/mnt/c/Program Files/draw.io/draw.io.exe` on WSL2, `draw.io.exe` on Windows. `-e` embeds the XML so the PNG is still editable; `-s 2` is 2× scale; `-b 10` is a 10-px border.)
+This produces `review.html` with the reference and candidate side-by-side, the structural score breakdown, and **actionable suggestions** mapped to the lowest-scoring fingerprint dimensions (e.g. "set the canvas to white", "add SAP edge colors", "swap PROMPT pill for TRUST"). The `--open` flag launches the page in the default browser.
+
+When the user is uncertain about which template to start from, browse the bundled gallery:
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/template_browser.py
+open .cache/template-browser/index.html
+```
+
+Pre-renders all 63 bundled SAP templates into a thumbnail grid with filter, domain badges, and the `scaffold_diagram.py --template <name>` invocation for each.
+
+### 6. Export (if requested) + narrate the flow
+
+If the user asked for a PNG/SVG/PDF, export with the bundled `render.py` wrapper:
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/render.py my-diagram.drawio \
+  --format png --scale 2 --border 10
+```
+
+The wrapper finds the draw.io desktop binary on macOS, Linux, and WSL2 automatically; set `$DRAWIO_CLI` to override.
 
 Finally, print the **flow narration** — a numbered list that spells out what each pill means. SAP Architecture Center puts this in the Markdown page **below** the embedded image, never inside the canvas. Example:
 
@@ -210,6 +244,7 @@ sap-architecture/
 │   ├── shapes-and-edges.md        — style strings + center-alignment + line semantics
 │   ├── layout.md                  — canvas skeleton + zone-by-zone placement
 │   ├── do-and-dont.md             — consolidated SAP rules with verbatim quotes
+│   ├── manual-workflow.md         — the realistic scaffold + edit + render-compare loop
 │   ├── generation-quality.md      — research-backed output checklist
 │   ├── external-test-corpus.md    — optional external SAP corpus for evaluation
 │   ├── improvement-options.md     — researched ranking of quality-improvement options
@@ -235,6 +270,9 @@ sap-architecture/
     ├── check_asset_coverage.py    — smoke-check library/index/palette coverage
     ├── scaffold_diagram.py        — copy the closest SAP template to a destination (FIRST STEP)
     ├── select_reference.py        — request text → ranked SAP template candidates
+    ├── template_browser.py        — pre-render the 63 templates into a thumbnail gallery
+    ├── render.py                  — drawio CLI wrapper (export to PNG/SVG/PDF)
+    ├── render_compare.py          — render candidate + reference, build side-by-side HTML review
     ├── compare.py                 — pairwise fingerprint score against one reference
     ├── score_corpus.py            — candidate → best score across all references
     ├── eval_corpus.py             — opt-in Ollama corpus evaluation loop
