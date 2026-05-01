@@ -82,6 +82,14 @@ description ┐
 
 For `eval_corpus.py run --exclude-target-template`, the exact target is removed from the selector pool. The harness therefore adds an explicit primary visual-neighbor hint computed with `compare.py` fingerprints. This is not used for normal production generation; it makes the leave-one-out research loop test the closest available SAP layout instead of an arbitrary semantic neighbor.
 
+The harness also records the selected-template target baseline for every case. This is the score of the alternate template before any model label plan is applied. In overnight leave-one-out runs, low baseline scores are a ceiling signal: label edits can improve content overlap, but they cannot invent the target's canvas rhythm, vertex count, zone proportions, edge topology, or service-icon density. Reports classify these as:
+
+- `near-miss`: failed, but within `--retry-margin` of `--min-score`; retrying, adding metadata, or improving label replacement may help.
+- `ceiling-limited`: failed below the retry floor; add a closer SAP sibling template or implement geometry-aware generation before spending more model time.
+- `model-failure` / `validator-failure`: fix the generation or validation error first.
+
+The default `--retry-margin 8` means a `--min-score 90` run stops retrying cases below 82. This reflects the observed overnight loop: most large gaps were template-coverage gaps, not stochastic model failures.
+
 ## Worked example — `examples/iam-arc1-mcp-l2.drawio`
 
 The bundled `examples/iam-arc1-mcp-l2.drawio` was produced by:

@@ -85,6 +85,7 @@ class EvalCase:
     description: str
     selected_template: str
     selected_template_score: float
+    selected_template_target_score: float | None = None
     selected_template_is_target: bool = False
     selector_candidates: list[dict[str, Any]] = field(default_factory=list)
     style_neighbor_hints: list[dict[str, Any]] = field(default_factory=list)
@@ -115,6 +116,8 @@ class CaseResult:
     attempts: list[AttemptResult] = field(default_factory=list)
     passed: bool = False
     best_score: float = 0.0
+    retry_stopped_early: bool = False
+    retry_stop_reason: str | None = None
 
 
 def default_reference_inputs(args: argparse.Namespace) -> list[Path]:
@@ -270,6 +273,10 @@ def style_neighbors_for(path: Path, candidates: list[Path], limit: int = 3) -> l
     return rows[:limit]
 
 
+def fingerprint_score(reference: Path, candidate: Path) -> float:
+    return compare(cached_fingerprint(reference), cached_fingerprint(candidate)).score
+
+
 def build_description(path: Path, style_neighbor_hints: list[dict[str, Any]] | None = None) -> tuple[str, str]:
     labels = visible_drawio_labels(path)
     title = title_for(path, labels)
@@ -373,6 +380,7 @@ def build_cases(
         )
         title, description = build_description(ref, style_neighbor_hints)
         selected, selected_score, selector_candidates = select_template(description, selector_pool)
+        selected_template_target_score = fingerprint_score(ref, selected)
         cases.append(
             EvalCase(
                 case_id=case_id_for(ref),
@@ -382,6 +390,7 @@ def build_cases(
                 description=description,
                 selected_template=str(selected),
                 selected_template_score=selected_score,
+                selected_template_target_score=selected_template_target_score,
                 selected_template_is_target=same_path(selected, ref),
                 selector_candidates=selector_candidates,
                 style_neighbor_hints=style_neighbor_hints,
@@ -673,6 +682,44 @@ def score_pair(reference: Path, candidate: Path) -> float:
     return compare(fingerprint(reference), fingerprint(candidate)).score
 
 
+def best_attempt_for(result: CaseResult) -> AttemptResult | None:
+    if not result.attempts:
+        return None
+    return max(result.attempts, key=lambda a: a.pass_score or 0.0)
+
+
+def score_band(score: float) -> str:
+    if score >= 90:
+        return "90+"
+    if score >= 85:
+        return "85-90"
+    if score >= 82:
+        return "82-85"
+    if score >= 80:
+        return "80-82"
+    if score >= 70:
+        return "70-80"
+    if score >= 60:
+        return "60-70"
+    return "<60"
+
+
+def classify_result(result: CaseResult, min_score: float, retry_margin: float) -> str:
+    if result.passed:
+        return "passed"
+    attempt = best_attempt_for(result)
+    if attempt is None:
+        return "not-run"
+    if attempt.model_error and attempt.pass_score is None:
+        return "model-failure"
+    if attempt.validate_errors:
+        return "validator-failure"
+    retry_floor = min_score - retry_margin
+    if result.best_score >= retry_floor:
+        return "near-miss"
+    return "ceiling-limited"
+
+
 def compare_payload(reference: Path, candidate: Path) -> dict[str, Any]:
     ref = fingerprint(reference)
     cand = fingerprint(candidate)
@@ -815,6 +862,24 @@ def run_cases(
             if attempt_result.passed:
                 case_result.passed = True
                 break
+            if args.generator == "baseline":
+                if attempt < args.max_attempts:
+                    case_result.retry_stopped_early = True
+                    case_result.retry_stop_reason = "baseline generator is deterministic"
+                break
+            if (
+                do_score
+                and attempt_result.pass_score is not None
+                and args.retry_margin >= 0
+                and attempt_result.pass_score < args.min_score - args.retry_margin
+                and attempt < args.max_attempts
+            ):
+                case_result.retry_stopped_early = True
+                case_result.retry_stop_reason = (
+                    f"pass_score={attempt_result.pass_score:.1f} below retry floor "
+                    f"{args.min_score - args.retry_margin:.1f}"
+                )
+                break
             if attempt_result.failure and not args.continue_on_error and attempt == args.max_attempts:
                 break
         write_json(case_dir / "result.json", asdict(case_result))
@@ -822,17 +887,19 @@ def run_cases(
         if not case_result.passed and not args.continue_on_error:
             break
 
-    write_reports(run_dir, results, args.min_score, args.pass_mode)
+    write_reports(run_dir, results, args.min_score, args.pass_mode, args.retry_margin)
     return run_dir, results
 
 
-def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pass_mode: str) -> None:
+def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pass_mode: str, retry_margin: float) -> None:
     passed = sum(1 for r in results if r.passed)
     scores = [r.best_score for r in results if r.best_score]
-    best_attempts = {
-        r.case.case_id: max(r.attempts, key=lambda a: a.pass_score or 0.0) if r.attempts else None
-        for r in results
-    }
+    best_attempts = {r.case.case_id: best_attempt_for(r) for r in results}
+    classifications = {r.case.case_id: classify_result(r, min_score, retry_margin) for r in results}
+    score_bands: dict[str, int] = {}
+    for r in results:
+        band = score_band(r.best_score)
+        score_bands[band] = score_bands.get(band, 0) + 1
     target_scores = [
         a.target_score
         for a in best_attempts.values()
@@ -843,6 +910,11 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pa
         for a in best_attempts.values()
         if a is not None and a.corpus_score is not None
     ]
+    baseline_scores = [
+        r.case.selected_template_target_score
+        for r in results
+        if r.case.selected_template_target_score is not None
+    ]
     summary = {
         "run_dir": str(run_dir),
         "case_count": len(results),
@@ -850,9 +922,20 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pa
         "failed": len(results) - passed,
         "min_score": min_score,
         "pass_mode": pass_mode,
+        "retry_margin": retry_margin,
+        "retry_floor": min_score - retry_margin,
+        "attempt_count": sum(len(r.attempts) for r in results),
+        "average_attempts": round(sum(len(r.attempts) for r in results) / len(results), 2) if results else 0.0,
+        "early_stopped_count": sum(1 for r in results if r.retry_stopped_early),
+        "near_miss_count": sum(1 for r in results if classifications[r.case.case_id] == "near-miss"),
+        "ceiling_limited_count": sum(1 for r in results if classifications[r.case.case_id] == "ceiling-limited"),
+        "model_failure_count": sum(1 for r in results if classifications[r.case.case_id] == "model-failure"),
+        "validator_failure_count": sum(1 for r in results if classifications[r.case.case_id] == "validator-failure"),
+        "score_bands": dict(sorted(score_bands.items())),
         "average_best_score": round(sum(scores) / len(scores), 1) if scores else 0.0,
         "average_target_score": round(sum(target_scores) / len(target_scores), 1) if target_scores else 0.0,
         "average_corpus_score": round(sum(corpus_scores) / len(corpus_scores), 1) if corpus_scores else 0.0,
+        "average_selected_template_target_score": round(sum(baseline_scores) / len(baseline_scores), 1) if baseline_scores else 0.0,
         "selected_target_template_count": sum(1 for r in results if r.case.selected_template_is_target),
         "results": [asdict(r) for r in results],
     }
@@ -866,14 +949,67 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pa
         f"- Failed: {len(results) - passed}",
         f"- Pass mode: {pass_mode}",
         f"- Minimum pass score: {min_score}",
+        f"- Retry floor: {summary['retry_floor']} (`--retry-margin {retry_margin}`)",
+        f"- Attempts: {summary['attempt_count']} (average {summary['average_attempts']})",
+        f"- Early retry stops: {summary['early_stopped_count']}",
+        f"- Near misses: {summary['near_miss_count']}",
+        f"- Ceiling-limited cases: {summary['ceiling_limited_count']}",
         f"- Average pass score: {summary['average_best_score']}",
         f"- Average target score: {summary['average_target_score']}",
         f"- Average corpus score: {summary['average_corpus_score']}",
+        f"- Average selected-template target baseline: {summary['average_selected_template_target_score']}",
         f"- Selected target template count: {summary['selected_target_template_count']}",
         "",
-        "| Case | Family | Passed | Pass score | Target score | Corpus score | Target template | Candidate |",
-        "|---|---|---:|---:|---:|---:|---:|---|",
+        "## Score Bands",
+        "",
     ]
+    for band in ("90+", "85-90", "82-85", "80-82", "70-80", "60-70", "<60"):
+        lines.append(f"- {band}: {score_bands.get(band, 0)}")
+
+    lines.extend(
+        [
+            "",
+            "| Case | Family | Class | Attempts | Pass score | Target score | Corpus score | Template baseline | Candidate |",
+            "|---|---|---|---:|---:|---:|---:|---:|---|",
+        ]
+    )
+    for r in results:
+        best = best_attempts[r.case.case_id]
+        target = best.target_score if best and best.target_score is not None else 0.0
+        corpus = best.corpus_score if best and best.corpus_score is not None else 0.0
+        candidate = best.candidate if best and best.candidate else ""
+        baseline = r.case.selected_template_target_score or 0.0
+        lines.append(
+            f"| `{r.case.case_id}` | {r.case.family} | {classifications[r.case.case_id]} | "
+            f"{len(r.attempts)} | {r.best_score:.1f} | {target:.1f} | {corpus:.1f} | "
+            f"{baseline:.1f} | `{candidate}` |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Retry Stops",
+            "",
+            "| Case | Reason |",
+            "|---|---|",
+        ]
+    )
+    stopped = [r for r in results if r.retry_stopped_early]
+    if stopped:
+        for r in stopped:
+            lines.append(f"| `{r.case.case_id}` | {r.retry_stop_reason or ''} |")
+    else:
+        lines.append("| None | |")
+
+    lines.extend(
+        [
+            "",
+            "## Legacy Table",
+            "",
+            "| Case | Family | Passed | Pass score | Target score | Corpus score | Target template | Candidate |",
+            "|---|---|---:|---:|---:|---:|---:|---|",
+        ]
+    )
     for r in results:
         best_attempt = best_attempts[r.case.case_id]
         target = best_attempt.target_score if best_attempt and best_attempt.target_score is not None else 0.0
@@ -927,8 +1063,8 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pa
             "",
             "## Case Details",
             "",
-            "| Case | Reference | Selected template | Target template | Validator | Target score | Corpus score | Best corpus reference |",
-            "|---|---|---|---:|---:|---:|---:|---|",
+            "| Case | Reference | Selected template | Template baseline | Target template | Validator | Target score | Corpus score | Best corpus reference |",
+            "|---|---|---|---:|---:|---:|---:|---:|---|",
         ]
     )
     for r in results:
@@ -943,8 +1079,10 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pa
         )
         corpus_score = best_attempt.corpus_score if best_attempt and best_attempt.corpus_score is not None else 0.0
         target_score = best_attempt.target_score if best_attempt and best_attempt.target_score is not None else 0.0
+        baseline = r.case.selected_template_target_score or 0.0
         lines.append(
             f"| `{r.case.case_id}` | `{reference}` | `{selected}` | "
+            f"{baseline:.1f} | "
             f"{str(r.case.selected_template_is_target).lower()} | {validator} | "
             f"{target_score:.1f} | {corpus_score:.1f} | `{best_ref}` |"
         )
@@ -972,9 +1110,10 @@ def write_reports(run_dir: Path, results: list[CaseResult], min_score: float, pa
             "",
             "## Suggested Improvement Review",
             "",
-            "- Inspect failed case `result.json` files for repeated validator errors.",
-            "- Compare low-scoring candidates with `compare.py <reference> <candidate>`.",
-            "- Convert recurring diffs into `SKILL.md`, selector, validator, or autofix updates.",
+            "- Treat `ceiling-limited` cases as template-coverage gaps. The selected alternate SAP layout is already too far below the target; more Ollama attempts are unlikely to fix geometry, canvas rhythm, icon count, or edge topology.",
+            "- Treat `near-miss` cases as useful retry targets. These are close enough that label replacements, small template-selection changes, or one extra sibling template can move them over the threshold.",
+            "- Compare low-scoring candidates with `compare.py <reference> <candidate>` and add sibling templates or targeted selector metadata when the baseline score is below the retry floor.",
+            "- Convert recurring diffs into `SKILL.md`, selector, validator, autofix, or curated template updates.",
         ]
     )
     (run_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -1103,6 +1242,7 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
     print(f"dry-run cases: {len(cases)}")
     print(f"generator    : {args.generator}")
     print(f"pass mode    : {args.pass_mode}")
+    print(f"retry margin : {args.retry_margin}")
     print(f"exclude target template: {str(args.exclude_target_template).lower()}")
     print(f"apply model plan: {str(args.apply_model_plan).lower()}")
     if args.generator == "ollama":
@@ -1111,6 +1251,8 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
         print(f"- {case.case_id}: {case.title}")
         print(f"  target  : {case.reference}")
         print(f"  template: {case.selected_template} score={case.selected_template_score:.1f} (target={str(case.selected_template_is_target).lower()})")
+        if case.selected_template_target_score is not None:
+            print(f"  baseline: target-score={case.selected_template_target_score:.1f}")
         if case.style_neighbor_hints:
             neighbors = ", ".join(f"{item['name']}:{item['score']:.1f}" for item in case.style_neighbor_hints)
             print(f"  visual  : {neighbors}")
@@ -1191,6 +1333,15 @@ def add_generation_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--generator", choices=("baseline", "ollama"), default="baseline")
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--max-attempts", type=int, default=1)
+    parser.add_argument(
+        "--retry-margin",
+        type=float,
+        default=8.0,
+        help=(
+            "Only retry failed scored cases whose pass score is within this many points "
+            "of --min-score. Use a large value such as 100 for exhaustive retries."
+        ),
+    )
     parser.add_argument("--timeout-seconds", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--min-score", type=float, default=90.0)

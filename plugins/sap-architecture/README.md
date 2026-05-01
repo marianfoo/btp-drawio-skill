@@ -91,7 +91,7 @@ All scripts use only the Python standard library — zero pip install required.
 | `compare.py <reference> <candidate>` | Pairwise structural/style/content fingerprint score. |
 | `score_corpus.py <candidate>` | Score a candidate against all bundled references; `--min-score 90` makes it a gate. |
 | `eval_corpus.py create "..."` | Create one diagram from a natural-language description, optionally with Ollama planning and model-plan label application. |
-| `eval_corpus.py run --generator ollama` | Opt-in target-aware corpus loop for local Ollama experiments. Use `--exclude-target-template` to prevent copying the target; the harness then uses closest visual-neighbor hints unless `--no-style-neighbor-hints` is set. Writes candidates and reports under `.cache/sap-architecture-eval/`. |
+| `eval_corpus.py run --generator ollama` | Opt-in target-aware corpus loop for local Ollama experiments. Use `--exclude-target-template` to prevent copying the target; the harness then uses closest visual-neighbor hints unless `--no-style-neighbor-hints` is set. Reports selected-template baseline score, near-miss vs ceiling-limited failures, and uses `--retry-margin` to avoid repeated attempts when the alternate SAP layout is already too far from the target. Writes candidates and reports under `.cache/sap-architecture-eval/`. |
 | `build_icon_index.py` | Re-parse the BTP service icon library into `assets/icon-index.json`. Run after refreshing the library from SAP upstream. |
 | `build_asset_index.py` | Re-parse all bundled SAP draw.io libraries into `assets/asset-index.json`. |
 | `check_asset_coverage.py` | Smoke-check library presence, index counts, SAP Build coverage, and official SAP preset colors. |

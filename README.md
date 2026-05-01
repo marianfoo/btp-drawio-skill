@@ -203,6 +203,8 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/score_corpus.py
 
 When `--exclude-target-template` is used, the harness now adds explicit "visual fallback" hints computed from the target reference fingerprint. That means the exact target cannot be copied, but the selected starting template is the closest available SAP layout. Add `--no-style-neighbor-hints` if you want a stricter pure-semantic leave-one-out selector test.
 
+The report now separates `near-miss` cases from `ceiling-limited` cases. Near misses are worth retrying; ceiling-limited cases need better sibling templates or geometry-aware generation because the selected alternate SAP layout is already too far below the target. The default `--retry-margin 8` only retries cases scoring 82+ when `--min-score 90`, which avoids wasting long Ollama runs on structurally impossible cases. Use `--retry-margin 100` only when you deliberately want the old exhaustive behavior.
+
 Fast smoke checks:
 
 ```bash
@@ -249,6 +251,7 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py 
   --exclude-target-template \
   --apply-model-plan \
   --max-attempts 1 \
+  --retry-margin 8 \
   --min-score 90 \
   --continue-on-error
 ```
@@ -262,6 +265,7 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py 
   --exclude-target-template \
   --no-style-neighbor-hints \
   --max-attempts 1 \
+  --retry-margin 8 \
   --min-score 90 \
   --continue-on-error
 ```
@@ -275,7 +279,9 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/eval_corpus.py 
   --exclude-target-template \
   --apply-model-plan \
   --max-attempts 3 \
+  --retry-margin 8 \
   --min-score 90 \
+  --timeout-seconds 1200 \
   --continue-on-error
 ```
 
