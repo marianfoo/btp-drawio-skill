@@ -274,7 +274,27 @@ def family_for(path: Path) -> str:
         return m.group(1)
     if path.name.startswith("btp_"):
         return "btp"
+    if path.name.startswith("ext_"):
+        return _ext_family_for(path)
     return "unknown"
+
+
+_EXT_FAMILY_MAP = {
+    # Maps filename stem → family tag for templates from
+    # SAP/sap-btp-reference-architectures bundled under the ext_ prefix.
+    "ext_MasterDataIntegration": "ext-mdi",
+    "ext_BusinessToGovernment": "ext-b2g",
+    "ext_EventsToBusinessActions": "ext-events",
+    "ext_FederatedML_v2": "RA0003",
+    "ext_MultiRegionResiliency_v2": "RA0002",
+    "ext_GenAI_RAG_v2": "RA0005",
+    "ext_HyperscalerDatasphere": "RA0004",
+    "ext_CloudLeadingAuthn": "RA0019",
+}
+
+
+def _ext_family_for(path: Path) -> str:
+    return _EXT_FAMILY_MAP.get(path.stem, "ext")
 
 
 def title_from_stem(path: Path) -> str:
@@ -553,9 +573,20 @@ def run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
 
 
+def _json_default(obj: Any) -> Any:
+    if isinstance(obj, set):
+        return sorted(obj)
+    if hasattr(obj, "__fspath__"):
+        return str(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 def write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+    path.write_text(
+        json.dumps(data, indent=2, sort_keys=True, default=_json_default),
+        encoding="utf-8",
+    )
 
 
 def prompt_for_ollama(case: EvalCase, feedback: str | None = None) -> str:

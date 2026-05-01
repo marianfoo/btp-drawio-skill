@@ -531,6 +531,70 @@
       "domain": "process",
       "aliases": ["SAP Task Center L2", "Task Center technical"],
       "tags": ["taskcenter", "task", "inbox", "workflow", "l2"]
+    },
+    "ext_MasterDataIntegration.drawio": {
+      "title": "Master data integration on SAP BTP",
+      "family": "ext-master-data",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["Master Data Integration", "MDI", "central master data", "master data on BTP"],
+      "tags": ["master-data", "mdi", "data-integration", "integration", "harmonization", "consolidation"]
+    },
+    "ext_BusinessToGovernment.drawio": {
+      "title": "Business-to-Government integration on SAP BTP",
+      "family": "ext-b2g",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["B2G integration", "Business to Government", "tax authority integration", "regulatory reporting"],
+      "tags": ["b2g", "business-to-government", "regulatory", "tax", "compliance", "integration"]
+    },
+    "ext_EventsToBusinessActions.drawio": {
+      "title": "Events-to-business-actions framework on SAP BTP",
+      "family": "ext-events-actions",
+      "level": "l2",
+      "domain": "integration",
+      "aliases": ["events to business actions", "event-driven business actions", "event automation framework"],
+      "tags": ["event-driven", "eda", "eventmesh", "automation", "business-actions", "integration", "framework"]
+    },
+    "ext_FederatedML_v2.drawio": {
+      "title": "Federated machine learning reference architecture (alternate)",
+      "family": "ra0003",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["Federated ML alternate", "federated machine learning v2", "federated ML reference"],
+      "tags": ["federated", "ml", "machine-learning", "aicore", "ai", "training", "models", "data-science"]
+    },
+    "ext_MultiRegionResiliency_v2.drawio": {
+      "title": "Multi-region resiliency for SAP BTP use cases (alternate)",
+      "family": "ra0002",
+      "level": "l2",
+      "domain": "resiliency",
+      "aliases": ["multi-region resiliency v2", "regional resiliency BTP", "multi-region HA"],
+      "tags": ["resiliency", "multiregion", "multiaz", "high-availability", "failover", "disaster-recovery"]
+    },
+    "ext_GenAI_RAG_v2.drawio": {
+      "title": "Retrieval-augmented generation and generative AI on SAP BTP (alternate)",
+      "family": "ra0005",
+      "level": "l2",
+      "domain": "ai",
+      "aliases": ["GenAI RAG alternate", "retrieval augmented generation v2", "OpenAI RAG on BTP"],
+      "tags": ["genai", "rag", "retrieval", "embedding", "vector", "openai", "azure-openai"]
+    },
+    "ext_HyperscalerDatasphere.drawio": {
+      "title": "Explore your hyperscaler data with SAP Datasphere",
+      "family": "ra0004",
+      "level": "l2",
+      "domain": "data",
+      "aliases": ["Hyperscaler data with Datasphere", "Google Datasphere integration", "hyperscaler data exploration"],
+      "tags": ["data-integration", "hyperscaler", "datasphere", "google", "bigquery", "analytics"]
+    },
+    "ext_CloudLeadingAuthn.drawio": {
+      "title": "Cloud-leading authentication reference architecture",
+      "family": "ra0019",
+      "level": "l2",
+      "domain": "identity",
+      "aliases": ["Cloud-leading authentication", "cloud-leading authn", "IAS authentication"],
+      "tags": ["authentication", "authn", "ias", "identity", "cloud-leading", "saml", "oidc", "iam"]
     }
   }
 }

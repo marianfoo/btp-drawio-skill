@@ -100,6 +100,21 @@ A curated 52-template subset of the 127 reference architecture draw.io files at 
 | `ac_RA0029_JouleAgentsToolsEcosystem.drawio` | RA0029 / 5-integrate-joule-agents-and-tools-into-your-ecosystem |
 | `ac_RA0029_EmbodiedAIAgents.drawio` | RA0029 / 6-embodied-ai-agents |
 
+### From `SAP/sap-btp-reference-architectures` (prefix `ext_`)
+
+These files come from <https://github.com/SAP/sap-btp-reference-architectures>, also Apache-2.0 licensed by SAP SE. They cover scenarios that are not in `SAP/architecture-center` and fill gaps in our singleton-family coverage (Federated ML, Multi-Region Resiliency, Datasphere, Cloud-leading auth, plus three new families: Master Data Integration, Business-to-Government, Events-to-Business-Actions).
+
+| File | Original path |
+|---|---|
+| `ext_MasterDataIntegration.drawio` | integration/master-data-integration/architectures/Master-Data-Integration.drawio |
+| `ext_BusinessToGovernment.drawio` | integration/business-to-government-integration/architectures/Business-to-Government-Integration.drawio |
+| `ext_EventsToBusinessActions.drawio` | hyperscalers/events-to-business-actions/architectures/Events-to-business-actions-framework.drawio |
+| `ext_FederatedML_v2.drawio` | data-analytics/predictive-analytics/architectures/Federated-Machine-Learning.drawio |
+| `ext_MultiRegionResiliency_v2.drawio` | hyperscalers/multi-region-ha/architectures/Architecting-multi-region-resiliency-for-SAP-BTP-use-cases.drawio |
+| `ext_GenAI_RAG_v2.drawio` | hyperscalers/openai/architectures/Retrieval-Augmented-Generation-and-Generative-AI-on-SAP-BTP.drawio |
+| `ext_HyperscalerDatasphere.drawio` | hyperscalers/google-datasphere/architectures/Explore-your-Hyperscaler-data-with-SAP-Datasphere.drawio |
+| `ext_CloudLeadingAuthn.drawio` | security/cloud-leading-authn/architectures/Cloud-leading-Authentication.drawio |
+
 ## Apache License 2.0 — short summary
 
 - You may use, modify, and redistribute these files.
