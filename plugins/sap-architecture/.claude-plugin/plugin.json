@@ -1,6 +1,6 @@
 {
   "name": "sap-architecture",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Generate, validate, score, and autofix SAP / BTP / on-prem architecture diagrams as draw.io (.drawio) files following the official SAP BTP Solution Diagram Guidelines (Fiori Horizon palette, area/layer conventions, grey-circle service icons, connector semantics, L0-L2 levels). Bundles 100 SAP BTP service icons, 448 indexed SAP draw.io starter-kit assets, and 63 SAP reference templates.",
   "author": {
     "name": "Marian Zeis",

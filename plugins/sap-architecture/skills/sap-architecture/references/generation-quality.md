@@ -43,3 +43,6 @@ This checklist distills the research used to improve generated SAP BTP diagrams.
 - Unguarded model replacements are limited to title/service labels or near-typo corrections, reducing semantic drift.
 - Scoring normalizes known SAP upstream typos such as `Adminstrator`, `Provisoning`, and `Plaforms`, so corrected output is not penalized.
 - Per-attempt `target-compare.json` and `best-corpus-compare.json` files explain why a candidate did or did not match the target.
+- Ollama runs use `/api/generate` with a JSON schema by default, temperature `0`, and CLI fallback if the local API is unavailable. This follows Ollama's structured-output guidance and keeps long runs machine-consumable.
+- Retry attempts now receive compact score feedback from the previous attempt: validator counts, weak fingerprint dimensions, target diffs, and rejected label replacements. This makes second/third attempts useful for near-miss cases while leaving low-ceiling template gaps for human/template review.
+- See `references/improvement-options.md` for the researched option ranking and why direct XML generation, generic autolayout, and fine-tuning are not the best next moves for SAP-style fidelity.

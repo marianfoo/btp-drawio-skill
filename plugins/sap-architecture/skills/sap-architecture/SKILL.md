@@ -107,6 +107,7 @@ Build the full `.drawio` file following these references (every value cited back
 - `references/shapes-and-edges.md` — zone / card / pill / edge style strings, semantic line colors
 - `references/do-and-dont.md` — consolidated SAP rules (alternation, color proportion, one-logo, line-style semantics, …)
 - `references/generation-quality.md` — title/scope, relationship-label, abstraction-level, and model-output quality checklist
+- `references/improvement-options.md` — researched ranking of generation/evaluation improvement options
 
 Rules that matter most (the ones every junior attempt gets wrong):
 
@@ -190,6 +191,7 @@ sap-architecture/
 │   ├── do-and-dont.md             — consolidated SAP rules with verbatim quotes
 │   ├── generation-quality.md      — research-backed output checklist
 │   ├── external-test-corpus.md    — optional external SAP corpus for evaluation
+│   ├── improvement-options.md     — researched ranking of quality-improvement options
 │   └── corpus-findings.md         — 2026 corpus profile from SAP's public repos
 ├── assets/
 │   ├── libraries/

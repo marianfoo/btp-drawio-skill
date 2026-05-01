@@ -29,6 +29,8 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -49,11 +51,36 @@ SKILL_DIR = SCRIPT_DIR.parent
 DEFAULT_REFERENCE_DIR = SKILL_DIR / "assets" / "reference-examples"
 DEFAULT_OUT_DIR = Path(".cache") / "sap-architecture-eval"
 DEFAULT_MODEL = "qwen3.6:35b-a3b-nvfp4"
+DEFAULT_OLLAMA_ENDPOINT = "http://127.0.0.1:11434"
 DEFAULT_TIMEOUT_SECONDS = 600
 VISIBLE_TEXT_LIMIT = 1800
 ANSI_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 CONTROL_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 EXPECTED_MODEL_KEYS = {"title", "subtitle", "services", "flow_steps", "style_risks", "template_replacements"}
+GENERATION_PLAN_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "title": {"type": "string"},
+        "subtitle": {"type": "string"},
+        "services": {"type": "array", "items": {"type": "string"}},
+        "flow_steps": {"type": "array", "items": {"type": "string"}},
+        "style_risks": {"type": "array", "items": {"type": "string"}},
+        "template_replacements": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "from": {"type": "string"},
+                    "to": {"type": "string"},
+                },
+                "required": ["from", "to"],
+            },
+        },
+    },
+    "required": ["title", "subtitle", "services", "flow_steps", "style_risks", "template_replacements"],
+}
 RESERVED_REPLACEMENT_LABELS = {
     "access",
     "authentication",
@@ -115,6 +142,7 @@ class AttemptResult:
     pass_score: float | None = None
     passed: bool = False
     failure: str | None = None
+    feedback: str | None = None
 
 
 @dataclass
@@ -443,9 +471,18 @@ def write_json(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def prompt_for_ollama(case: EvalCase) -> str:
+def prompt_for_ollama(case: EvalCase, feedback: str | None = None) -> str:
     template_labels = "; ".join(visible_drawio_labels(Path(case.selected_template), limit=900)[:30])
     desired_labels = "; ".join(desired_label_hints(case.description))
+    feedback_block = ""
+    if feedback:
+        feedback_block = f"""
+
+Previous attempt feedback:
+{feedback}
+
+Use that feedback to improve only the JSON plan. In this harness, the plan can safely replace labels in an SAP template; it cannot redesign geometry from scratch. Prefer exact visible-label replacements that improve SAP terminology and target overlap while preserving the selected template's layout, colors, icon count, connector count, and notation.
+"""
     return f"""You are helping test an SAP Architecture Center draw.io generation skill.
 
 Return JSON only. Do not return XML. Do not use markdown fences.
@@ -461,6 +498,7 @@ Selected template visible labels:
 
 Desired scenario labels and service hints:
 {desired_labels}
+{feedback_block}
 
 Available local SAP starter-kit assets:
 - extract_icon.py for BTP service icons
@@ -482,6 +520,9 @@ services: array of important SAP or external services
 flow_steps: array of numbered flow step labels. Include protocols or semantics where useful, for example OAuth, OIDC, HTTPS, Principal Propagation, event, trust, authentication, or authorization.
 style_risks: array of visual risks to avoid
 template_replacements: array of objects with "from" and "to" label strings for adapting the selected template. Use exact "from" labels from the selected template visible labels. Prefer replacing the title, subtitle, zone headings, and service-card labels. Keep labels short enough to fit the original box.
+
+Required JSON schema:
+{json.dumps(GENERATION_PLAN_SCHEMA, indent=2)}
 """
 
 
@@ -514,8 +555,44 @@ def extract_json_object(text: str) -> tuple[str | None, str | None]:
     return json.dumps(parsed, indent=2, sort_keys=True), None
 
 
-def call_ollama(case: EvalCase, model: str, timeout_seconds: int) -> tuple[str, str | None, str | None]:
-    prompt = prompt_for_ollama(case)
+def call_ollama_api(
+    prompt: str,
+    model: str,
+    endpoint: str,
+    timeout_seconds: int,
+    temperature: float,
+) -> tuple[str, str | None, str | None]:
+    url = endpoint.rstrip("/") + "/api/generate"
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "format": GENERATION_PLAN_SCHEMA,
+        "think": False,
+        "options": {
+            "temperature": temperature,
+        },
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+        body = resp.read().decode("utf-8")
+    try:
+        api_response = json.loads(body)
+    except json.JSONDecodeError:
+        return body, None, "ollama API returned non-JSON response"
+    raw = str(api_response.get("response", "")).strip()
+    if not raw:
+        raw = json.dumps(api_response, indent=2, sort_keys=True)
+    model_json, parse_error = extract_json_object(raw)
+    return raw, model_json, parse_error
+
+
+def call_ollama_cli(prompt: str, model: str, timeout_seconds: int) -> tuple[str, str | None, str | None]:
     proc = subprocess.run(
         ["ollama", "run", model, "--format", "json", "--hidethinking", "--nowordwrap", "--think", "false"],
         input=prompt,
@@ -531,6 +608,24 @@ def call_ollama(case: EvalCase, model: str, timeout_seconds: int) -> tuple[str, 
         return raw, None, f"ollama exited {proc.returncode}"
     model_json, parse_error = extract_json_object(raw)
     return raw, model_json, parse_error
+
+
+def call_ollama(
+    case: EvalCase,
+    model: str,
+    timeout_seconds: int,
+    endpoint: str,
+    temperature: float,
+    feedback: str | None = None,
+) -> tuple[str, str | None, str | None]:
+    prompt = prompt_for_ollama(case, feedback)
+    try:
+        return call_ollama_api(prompt, model, endpoint, timeout_seconds, temperature)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raw, model_json, model_error = call_ollama_cli(prompt, model, timeout_seconds)
+        if model_error:
+            model_error = f"ollama API unavailable at {endpoint}: {exc}; CLI fallback failed: {model_error}"
+        return raw, model_json, model_error
 
 
 def make_candidate_from_template(case: EvalCase, candidate_path: Path) -> None:
@@ -767,27 +862,89 @@ def pass_score_for(pass_mode: str, target_score: float | None, corpus_score: flo
     raise ValueError(f"unknown pass mode {pass_mode!r}")
 
 
+def build_retry_feedback(
+    case: EvalCase,
+    result: AttemptResult,
+    target_payload: dict[str, Any] | None,
+    apply_result: dict[str, Any] | None,
+    min_score: float,
+) -> str:
+    lines = [
+        (
+            f"Attempt {result.attempt} scored pass={result.pass_score or 0.0:.1f}, "
+            f"target={result.target_score or 0.0:.1f}, corpus={result.corpus_score or 0.0:.1f}; "
+            f"required pass score is {min_score:.1f}."
+        )
+    ]
+    if result.validate_errors or result.validate_warnings:
+        lines.append(f"Validator: {result.validate_errors} errors, {result.validate_warnings} warnings.")
+    if case.selected_template_target_score is not None:
+        lines.append(
+            f"Selected-template ceiling against target is {case.selected_template_target_score:.1f}; "
+            "do not fight the template geometry when that ceiling is low."
+        )
+    if target_payload:
+        breakdown = target_payload.get("breakdown", {})
+        weak = [
+            f"{key}={value * 100:.0f}%"
+            for key, value in sorted(breakdown.items(), key=lambda item: item[1])
+            if isinstance(value, (int, float)) and value < 0.95
+        ][:6]
+        if weak:
+            lines.append("Weak target fingerprint dimensions: " + ", ".join(weak) + ".")
+        diffs = [str(diff) for diff in target_payload.get("diffs", [])[:5]]
+        if diffs:
+            lines.append("Target diffs: " + " | ".join(diffs) + ".")
+    if apply_result:
+        lines.append(
+            f"Previous label-plan application: applied={apply_result.get('applied', 0)}, "
+            f"rejected={apply_result.get('rejected', 0)}."
+        )
+        rejected = apply_result.get("rejected_changes") or []
+        if rejected:
+            examples = []
+            for item in rejected[:4]:
+                examples.append(f"{item.get('from', '')}->{item.get('to', '')}")
+            lines.append("Avoid rejected replacements: " + "; ".join(examples) + ".")
+    lines.append(
+        "Next attempt: return JSON only; use exact source labels from the selected template; "
+        "favor title, subtitle, zone heading, and service-card replacements over legend notation changes."
+    )
+    return clean_text(" ".join(lines))[:1800]
+
+
 def run_one_attempt(
     case: EvalCase,
     attempt: int,
     case_dir: Path,
     generator: str,
     model: str,
+    ollama_endpoint: str,
+    temperature: float,
     timeout_seconds: int,
     min_score: float,
     pass_mode: str,
     corpus_refs: list[Path],
     do_score: bool,
     apply_model_plan_enabled: bool,
+    feedback: str | None = None,
 ) -> AttemptResult:
     attempt_dir = case_dir / f"attempt-{attempt}"
     attempt_dir.mkdir(parents=True, exist_ok=True)
     result = AttemptResult(attempt=attempt)
     model_json_text: str | None = None
+    apply_result: dict[str, Any] | None = None
 
     if generator == "ollama":
         try:
-            raw, model_json, model_error = call_ollama(case, model, timeout_seconds)
+            raw, model_json, model_error = call_ollama(
+                case,
+                model,
+                timeout_seconds,
+                ollama_endpoint,
+                temperature,
+                feedback,
+            )
         except subprocess.TimeoutExpired:
             result.model_error = f"ollama timed out after {timeout_seconds}s"
             result.failure = result.model_error
@@ -829,7 +986,8 @@ def run_one_attempt(
 
     result.target_score = score_pair(Path(case.reference), candidate)
     result.corpus_score, result.best_corpus_reference = best_corpus_score(candidate, corpus_refs)
-    write_json(attempt_dir / "target-compare.json", compare_payload(Path(case.reference), candidate))
+    target_payload = compare_payload(Path(case.reference), candidate)
+    write_json(attempt_dir / "target-compare.json", target_payload)
     if result.best_corpus_reference:
         write_json(attempt_dir / "best-corpus-compare.json", compare_payload(Path(result.best_corpus_reference), candidate))
     result.pass_score = pass_score_for(pass_mode, result.target_score, result.corpus_score)
@@ -840,6 +998,7 @@ def run_one_attempt(
             f"pass_score={result.pass_score:.1f}, target_score={result.target_score:.1f}, "
             f"corpus_score={result.corpus_score:.1f}"
         )
+    result.feedback = build_retry_feedback(case, result, target_payload, apply_result, min_score)
     return result
 
 
@@ -860,6 +1019,7 @@ def run_cases(
         case_dir = run_dir / "cases" / case.case_id
         write_json(case_dir / "case.json", asdict(case))
         case_result = CaseResult(case=case)
+        retry_feedback: str | None = None
         for attempt in range(1, args.max_attempts + 1):
             attempt_result = run_one_attempt(
                 case=case,
@@ -867,16 +1027,20 @@ def run_cases(
                 case_dir=case_dir,
                 generator=args.generator,
                 model=args.model,
+                ollama_endpoint=args.ollama_endpoint,
+                temperature=args.temperature,
                 timeout_seconds=args.timeout_seconds,
                 min_score=args.min_score,
                 pass_mode=args.pass_mode,
                 corpus_refs=corpus_refs,
                 do_score=do_score,
                 apply_model_plan_enabled=args.apply_model_plan,
+                feedback=retry_feedback,
             )
             case_result.attempts.append(attempt_result)
             if attempt_result.pass_score is not None:
                 case_result.best_score = max(case_result.best_score, attempt_result.pass_score)
+            retry_feedback = attempt_result.feedback
             if attempt_result.passed:
                 case_result.passed = True
                 break
@@ -1165,7 +1329,13 @@ def cmd_create(args: argparse.Namespace) -> int:
     model_error: str | None = None
     if args.generator == "ollama":
         try:
-            raw_model_output, model_json_text, model_error = call_ollama(case, args.model, args.timeout_seconds)
+            raw_model_output, model_json_text, model_error = call_ollama(
+                case,
+                args.model,
+                args.timeout_seconds,
+                args.ollama_endpoint,
+                args.temperature,
+            )
         except subprocess.TimeoutExpired:
             model_error = f"ollama timed out after {args.timeout_seconds}s"
             raw_model_output = ""
@@ -1201,6 +1371,8 @@ def cmd_create(args: argparse.Namespace) -> int:
         "selected_template_score": case.selected_template_score,
         "generator": args.generator,
         "model": args.model if args.generator == "ollama" else None,
+        "ollama_endpoint": args.ollama_endpoint if args.generator == "ollama" else None,
+        "temperature": args.temperature if args.generator == "ollama" else None,
         "model_error": model_error,
         "autofix_rc": autofix.returncode,
         "validate_rc": validate_rc,
@@ -1265,6 +1437,8 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
     print(f"apply model plan: {str(args.apply_model_plan).lower()}")
     if args.generator == "ollama":
         print(f"model        : {args.model}")
+        print(f"endpoint     : {args.ollama_endpoint}")
+        print(f"temperature  : {args.temperature}")
     for case in cases:
         print(f"- {case.case_id}: {case.title}")
         print(f"  target  : {case.reference}")
@@ -1350,6 +1524,13 @@ def add_generation_args(parser: argparse.ArgumentParser) -> None:
     add_common_args(parser)
     parser.add_argument("--generator", choices=("baseline", "ollama"), default="baseline")
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--ollama-endpoint", default=DEFAULT_OLLAMA_ENDPOINT)
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="Ollama generation temperature. Keep 0 for deterministic structured plans.",
+    )
     parser.add_argument("--max-attempts", type=int, default=1)
     parser.add_argument(
         "--retry-margin",

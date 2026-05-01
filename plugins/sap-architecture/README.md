@@ -28,6 +28,7 @@ sap-architecture/
         │   ├── corpus-findings.md         — 2026 SAP corpus profile
         │   ├── generation-quality.md      — research-backed output checklist
         │   ├── external-test-corpus.md    — optional external SAP corpus for longer runs
+        │   ├── improvement-options.md     — researched ranking of quality-improvement options
         │   └── methodology.md             — comparison harness, fidelity claim
         ├── assets/
         │   ├── libraries/                 — 10 SAP draw.io starter-kit libraries
