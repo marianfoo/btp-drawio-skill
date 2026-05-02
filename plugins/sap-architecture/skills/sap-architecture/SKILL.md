@@ -129,7 +129,36 @@ You scaffolded from a SAP template in step 2. Now make the *minimum* edits requi
 
 **Do NOT touch:** canvas size, zone hierarchy (e.g. don't nest Joule inside BTP if the reference puts them side by side), network divider, SAP logos, footer band, identity-flow placement. Those carry the SAP visual identity; preserving them is what keeps the score above 90.
 
-For complex scenarios that require more than label edits — **stop and edit in draw.io desktop instead.** The realistic last 20% of polish requires a visual editor; see `references/manual-workflow.md` for the time-budget table per scenario complexity.
+For complex scenarios that require more than label edits, switch into **Nudge mode** below — it converges via small, scored steps with vision feedback, and is much more reliable than trying to land everything in one pass. The manual draw.io workflow (`references/manual-workflow.md`) remains the safety net for the last 20% of polish.
+
+### 4b. Nudge mode — iterate with vision + scored feedback (HIGHLY RECOMMENDED)
+
+When you (the LLM) are running inside Cursor or Claude Code with image-reading capability, prefer this loop over trying to one-shot the diagram:
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/iterate.py <candidate>.drawio
+# (use --target <ref>.drawio to lock the comparison target explicitly)
+```
+
+`iterate.py` renders both the candidate and the SAP target template to PNGs, runs the fingerprint comparison, and prints:
+
+- the score and its delta since the previous run (`↑+3.2`, `↓-1.5`, `→+0.0`)
+- paths to the two PNGs you should **read with your vision tool**
+- the lowest-scoring dimensions, ranked
+- a concrete numbered next-edit list — **pick ONE per iteration**, never multiple
+
+Disciplined loop:
+
+1. **First pass:** finish the surgical relabel (step 4 above), run autofix + iterate.
+2. **Visual review:** read both PNGs with your vision/read tool. Reason about layout, colors, missing pieces.
+3. **Pick one suggestion** from the printed list — usually #1, since it's the highest-weighted gap.
+4. **Make the edit** with Edit/Write tool calls. Keep it small and scoped.
+5. **autofix + iterate again.** Confirm the score went up. If it dropped, undo (git diff or editor history) and try a different approach.
+6. **Stop at PASS** (score ≥ 90) or when the user says it's good. Never thrash beyond plateau without a fresh nudge.
+
+When the user asks something like "move Joule to the left", "use teal for MCP pills", or "the agents look crowded", treat each nudge as one iteration: read the PNGs, find the relevant cells in the XML, make ONE targeted edit, then re-run iterate.
+
+Full loop documentation, including a nudge-to-edit mapping table and recovery patterns, is in `references/nudge-workflow.md`.
 
 Reference docs (every value cited back to the SAP guideline):
 
@@ -273,6 +302,7 @@ sap-architecture/
     ├── template_browser.py        — pre-render the 63 templates into a thumbnail gallery
     ├── render.py                  — drawio CLI wrapper (export to PNG/SVG/PDF)
     ├── render_compare.py          — render candidate + reference, build side-by-side HTML review
+    ├── iterate.py                 — Nudge-mode loop: render+score+structured next-steps for the LLM
     ├── compare.py                 — pairwise fingerprint score against one reference
     ├── score_corpus.py            — candidate → best score across all references
     ├── eval_corpus.py             — opt-in Ollama corpus evaluation loop

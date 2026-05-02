@@ -1,0 +1,93 @@
+---
+description: Use this rule whenever the user asks to create, draw, design, edit, or nudge any SAP / BTP / on-prem architecture diagram (XSUAA flow, Cloud Connector, Joule, MCP, Agentic AI, Task Center, Build Work Zone, Identity Lifecycle, Private Link, Event-Driven, Business Data Cloud, etc.). Output is a `.drawio` file.
+globs: docs/architecture/**, docs/diagrams/**, **/*.drawio
+alwaysApply: false
+---
+
+# SAP Architecture Skill — Nudge-mode workflow for Cursor
+
+You have access to the **sap-architecture skill**. The skill lives at:
+
+```
+~/Code/btp-drawio-skill/plugins/sap-architecture/skills/sap-architecture/
+```
+
+(Adjust the path above if you cloned the repo elsewhere.)
+
+## Initial creation — first response to a fresh diagram request
+
+Set this once at the top of your scratch:
+```bash
+SKILL=~/Code/btp-drawio-skill/plugins/sap-architecture/skills/sap-architecture/scripts
+```
+
+Then run, in this exact order:
+
+1. **Scaffold from a SAP reference template** (mandatory — never write `.drawio` XML from scratch):
+   ```bash
+   python3 $SKILL/scaffold_diagram.py "<the user's full diagram request, verbatim>" \
+     --out <destination>.drawio
+   ```
+   Read the printed alternates. If the chosen template is wrong family, re-run with `--template <correct>.drawio --force`.
+
+2. **Surgical relabel.** Open the destination file with the Read tool, find labels that need swapping for the user's scenario (titles, service-card values, zone names), and use Edit to change ONLY those strings. Do NOT rewrite the file. Do NOT touch canvas size, zone hierarchy, network divider, SAP logos, footer, or identity-flow placement.
+
+3. **Autofix + iterate (mandatory):**
+   ```bash
+   python3 $SKILL/autofix.py --write <destination>.drawio
+   python3 $SKILL/iterate.py <destination>.drawio
+   ```
+
+4. **Read both PNGs** that `iterate.py` printed under `.cache/sap-architecture-iter/<stem>/`. Use your image-reading tool. The candidate PNG is what you just produced; the reference PNG is the SAP target you should converge toward.
+
+5. **Pick ONE suggestion** from the printed "Next concrete edit" list. Make ONE edit. Re-run autofix + iterate. Loop until score ≥ 90 OR until the user gives a follow-up nudge.
+
+## Nudge mode — the user types something like "Joule should be on the left"
+
+Each nudge is one iteration:
+
+1. Read the latest candidate.png from `.cache/sap-architecture-iter/<stem>/`. Reason about the current state visually.
+2. Read the user's nudge as a single, scoped edit. Examples:
+   | User says | You do |
+   |---|---|
+   | "Make Joule purple" | Find Joule zone cell, set `fillColor=#F1ECFF;strokeColor=#5D36FF` |
+   | "Add MCP Gateway in BTP" | Duplicate an existing card inside BTP zone, label it `MCP Gateway`, swap its icon via `extract_icon.py "Integration Suite"` |
+   | "Move System Trigger to bottom-left" | Edit System Trigger's `<mxGeometry x=... y=...>` to small x and large y. Keep on 10-px grid. |
+   | "Use teal pills for MCP" | Find MCP-flow pills (`arcSize=50`), set `fillColor=#DAFDF5;strokeColor=#07838F` |
+   | "Try a different template" | Confirm with user, then `scaffold_diagram.py --template <other> --out <same> --force` |
+3. Run `autofix.py && iterate.py`.
+4. Watch the delta. If the score went DOWN, undo via git or editor history before trying again. If it went UP or stayed flat, confirm with the user and wait for the next nudge.
+
+## Hard rules enforced by `validate.py`
+
+These will fail the validator:
+
+- **Dark `pageBackgroundColor`** — error. SAP always uses white/transparent.
+- **Novelty pill verbs** like `PROMPT`, `ROUTE`, `CONTEXT`, `DELEGATE`, `INVOKE`, `FETCH` — warning. Replace with canonical SAP set: `TRUST`, `Authenticate`, `Authorization`, `A2A`, `MCP`, `ORD`, `HTTPS`, `OData/REST`, `SAML2/OIDC`, `SCIM`, `Identity Lifecycle`.
+- **Multiple SAP logos** beyond ~6 — warning. SAP guidance: "Don't use too many SAP logos in the same diagram. Use text-only elements instead."
+
+## Connector color semantics (SAP-mandated)
+
+- trust = pink `#CC00DC`
+- authentication = green `#188918`
+- authorization = indigo `#5D36FF`
+- structural = slate `#475E75`
+- MCP / accent = teal `#07838F`
+- Joule focus zone = purple `#5D36FF` border / `#F1ECFF` fill
+
+## Anchor templates (when scaffold should pin to a specific one)
+
+- Full **Agentic AI / AI Agents with Joule** landscape → `ac_RA0029_AgenticAI_root.drawio`. Use `EmbodiedAIAgents` only when prompt says embodied/robotic/physical.
+- Focused **A2A / MCP** flow → `ac_RA0029_A2A_MCP.drawio`.
+- **Joule tool ecosystem** overview → `ac_RA0029_JouleAgentsToolsEcosystem.drawio`.
+- **Master Data Integration** → `ext_MasterDataIntegration.drawio`.
+- **Business-to-Government** → `ext_BusinessToGovernment.drawio`.
+- **Multi-Region resiliency** with hyperscaler depth → `ext_MultiRegionResiliency_v2.drawio`.
+
+## When NOT to keep iterating
+
+- Five consecutive iterations with score delta < ±0.5: stop and ask the user what to nudge next.
+- Score is at 90+ and the user gave no follow-up: stop and present the result.
+- The user's nudge would require a destructive change (template swap, zone deletion they didn't ask for): confirm first.
+
+The full workflow doc is in `references/nudge-workflow.md` of the skill folder.
