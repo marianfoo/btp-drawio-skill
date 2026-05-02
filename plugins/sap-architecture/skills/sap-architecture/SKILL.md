@@ -94,8 +94,17 @@ For every BTP service in your plan, look up the icon:
 
 ```bash
 python3 .claude/skills/sap-architecture/scripts/extract_icon.py "Destination Service" \
-  --x 600 --y 300 --w 80 --h 96 --id svc-dest --parent 1
+  --x 600 --y 300 --id svc-dest --parent 1
 ```
+
+**Icon size — critical, this is the #1 visible bug:** the SAP corpus uses **32×32 px** for the vast majority of icons (224× across the 71 templates), then **48×48** (157×) only for focal anchors next to a zone label. The script's defaults are now `--w 32 --h 32`. **Do not override above 48×48** — anything 64+ overpowers the cards and overlaps text. The validator now flags `w>64 or h>64` as a warning.
+
+**Icon placement — the second most common bug:** never drop an icon on top of a card's text. Two safe patterns:
+
+1. **Tucked inside a card** — set the icon's `parent` to the card's id, with small local `x` / `y` (e.g. `x=8 y=8 w=24 h=24`). The icon sits in the card's top-left corner.
+2. **In a dedicated empty region** — a 32×32 icon in a slot near the zone label, with no other vertex within ~40 px.
+
+The validator now flags any icon that overlaps a non-icon vertex by more than 25% of the icon's area.
 
 The script:
 - Fuzzy-matches the service name against the 100-icon index (`assets/icon-index.json`)
@@ -172,6 +181,10 @@ Reference docs (every value cited back to the SAP guideline):
 
 Rules that matter most (the ones every junior attempt gets wrong):
 
+0. **Icon size is 32×32, max 48×48.** Larger icons (the validator now flags w>64 or h>64) overpower cards and overlap text. The bug looks like "huge cyan SAP icons sitting on top of card titles." Use `extract_icon.py` defaults; do not override unless the icon is a focal anchor.
+0a. **Edges must dock with `entryX/exitX` anchors OR have aligned centers.** A naked `<mxCell edge="1" source="A" target="B">` draws a straight diagonal line through whatever's in the way. The validator now flags edges that pass through unrelated cards. Two fixes per edge:
+   - Add `edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;` to dock to the right side of source and left side of target.
+   - Or reposition source/target so the straight line has no obstacle.
 1. **Centers must align for straight edges.** For an `orthogonalEdgeStyle` edge between A and B to render without a kink, either `A.centerX == B.centerX` or `A.centerY == B.centerY`. See `shapes-and-edges.md`.
 2. **`absoluteArcSize=1` next to every `arcSize`.** Without it, 16 is percent and zones get 130-px-radius corners. SAP fixes corner radius at **16 px** ([`areas.md`](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/areas.md)).
 3. **`labelBackgroundColor=default` on every edge label.** Else text bleeds into the `#EBF8FF` BTP fill.

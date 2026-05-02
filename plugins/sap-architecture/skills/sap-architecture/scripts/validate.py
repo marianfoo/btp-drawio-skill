@@ -576,6 +576,185 @@ def validate(path: Path) -> Report:
             "repetition. Use text-only product labels instead beyond zone branding.",
         )
 
+    # ---- icon-size check ---------------------------------------------------
+    # SAP corpus: icons cluster tightly at 32x32 (224x), 48x48 (157x), 28x28 (85x).
+    # Icons larger than ~64 px overpower cards and overlap their text — the
+    # most common visible bug from LLM-generated diagrams.
+    for cid, cell in cells.items():
+        if cell.get("vertex") != "1":
+            continue
+        style = parse_style(cell.get("style"))
+        is_icon = (
+            style.get("shape") == "image"
+            and style.get("image", "").startswith(("data:image/svg", "data:image/png"))
+        ) or "mxgraph.sap.icon" in (cell.get("style") or "")
+        if not is_icon:
+            continue
+        g = geom(cell)
+        if not g:
+            continue
+        _, _, w, h = g
+        # Only flag near-square images that are big in both dimensions. SAP uses
+        # horizontal text banners (e.g. 67x18 for product names) which are
+        # technically `shape=image` but aren't "icons" in the visual-bug sense.
+        is_square_ish = 0.5 <= (w / max(1, h)) <= 2.0
+        if w > 64 and h > 64 and is_square_ish:
+            report.add(
+                "warning",
+                "style",
+                f"icon w={int(w)}×h={int(h)} is oversized — SAP corpus standard is 32×32 (most common) "
+                "or 48×48 for focal anchors. Resize this icon to avoid overlapping card text.",
+                cell=cid,
+            )
+
+    # ---- icon-overlapping-text check --------------------------------------
+    # An icon dropped on top of a card's text region is the signature failure
+    # of LLM-placed icons. Detect by: icon vertex whose bounding box overlaps
+    # a non-image vertex by more than 25% of the icon's area, where the other
+    # vertex has a non-empty visible label.
+    icon_cells: list[tuple[str, tuple[float, float, float, float]]] = []
+    text_vertex_cells: list[tuple[str, tuple[float, float, float, float]]] = []
+    for cid, cell in cells.items():
+        if cell.get("vertex") != "1":
+            continue
+        g = geom(cell)
+        if not g:
+            continue
+        style = parse_style(cell.get("style"))
+        is_icon = (
+            style.get("shape") == "image"
+            and style.get("image", "").startswith(("data:image/svg", "data:image/png"))
+        ) or "mxgraph.sap.icon" in (cell.get("style") or "")
+        if is_icon:
+            icon_cells.append((cid, g))
+            continue
+        # text-bearing card: has a non-empty visible label and a fill (so it's a card, not chrome)
+        raw = cell.get("value") or ""
+        label = strip_html(raw).strip()
+        if not label:
+            continue
+        if style.get("fillColor", "").lower() in ("none", ""):
+            continue
+        if style.get("shape") in ("ellipse",):
+            continue  # ellipses are often legend dots, not text cards
+        text_vertex_cells.append((cid, g))
+
+    for icon_id, ig in icon_cells:
+        ix, iy, iw, ih = ig
+        icon_area = max(1.0, iw * ih)
+        for txt_id, tg in text_vertex_cells:
+            ov = bbox_overlap(ig, tg)
+            if ov < icon_area * 0.25:
+                continue
+            # Skip if icon is entirely INSIDE the card (intentional inline placement)
+            tx, ty, tw, th = tg
+            if tx <= ix and ty <= iy and tx + tw >= ix + iw and ty + th >= iy + ih:
+                continue
+            report.add(
+                "warning",
+                "align",
+                f"icon {icon_id} overlaps card {txt_id} by {int(ov)}px² — icon will block "
+                "card text. Move the icon to a dedicated empty region OR shrink it to 32×32 "
+                "and tuck it inside the card.",
+                cell=icon_id,
+            )
+
+    # ---- edges passing through other cells --------------------------------
+    # An edge from A to B should not run its straight-line path across the
+    # bounding box of unrelated card C. This produces the visible bug of
+    # "arrows that look like they hit the card." Sample 50 points along the
+    # edge's straight path; flag if any unrelated vertex contains > 5 of them.
+    other_cells_by_scope: dict[int, list[tuple[str, tuple[float, float, float, float]]]] = {}
+    for cid, cell in cells.items():
+        if cell.get("vertex") != "1":
+            continue
+        g = geom(cell)
+        if not g or g[2] <= 0 or g[3] <= 0:
+            continue
+        scope = cell_scopes.get(cid, 0)
+        other_cells_by_scope.setdefault(scope, []).append((cid, g))
+
+    for cid, cell in cells.items():
+        if cell.get("edge") != "1":
+            continue
+        s_id, t_id = cell.get("source"), cell.get("target")
+        if not s_id or not t_id:
+            continue
+        scope = cell_scopes.get(cid, 0)
+        src = cells.get(scoped_id(scope, s_id))
+        tgt = cells.get(scoped_id(scope, t_id))
+        if src is None or tgt is None:
+            continue
+        sg, tg = geom(src), geom(tgt)
+        if not sg or not tg:
+            continue
+        # Endpoints: card centers (this is where draw.io draws straight edges to)
+        sx, sy = sg[0] + sg[2] / 2, sg[1] + sg[3] / 2
+        tx, ty = tg[0] + tg[2] / 2, tg[1] + tg[3] / 2
+        # Walk the straight line; collect any cell that is hit by > 5 sample points
+        through: dict[str, int] = {}
+        steps = 50
+        for i in range(1, steps):
+            tparam = i / steps
+            px = sx + (tx - sx) * tparam
+            py = sy + (ty - sy) * tparam
+            for other_id, og in other_cells_by_scope.get(scope, []):
+                if other_id == src.get("id") or other_id == tgt.get("id"):
+                    continue
+                if other_id in (s_id, t_id):
+                    continue
+                ox, oy, ow, oh = og
+                if ox < px < ox + ow and oy < py < oy + oh:
+                    through[other_id] = through.get(other_id, 0) + 1
+        # Report edges that clearly cross unrelated cells (parents/zones excluded)
+        # A "parent" of source/target is acceptable (the edge enters its own zone)
+        src_parent = src.get("parent")
+        tgt_parent = tgt.get("parent")
+        for other_id, count in sorted(through.items(), key=lambda kv: -kv[1]):
+            # Require substantial coverage: > 25% of the sampled path AND a
+            # minimum absolute step count. Otherwise we get noise from edges
+            # that just clip the corner of an unrelated cell.
+            if count < 13:
+                continue
+            if other_id in {src_parent, tgt_parent}:
+                continue  # edge passes through its own zone — fine
+            # Also skip if "other" is a transparent / chrome cell (no fill)
+            other_cell = cells.get(other_id)
+            if other_cell is None:
+                continue
+            ostyle = parse_style(other_cell.get("style"))
+            if ostyle.get("fillColor", "").lower() in ("none", "") and ostyle.get("shape") not in ("image",):
+                continue
+            # Skip cells with no visible label — they're decorative chrome
+            # (background bands, page borders, container shells). The user
+            # only cares when an arrow visibly crosses a labeled card.
+            other_raw = other_cell.get("value") or ""
+            other_label = strip_html(other_raw).strip()
+            if not other_label:
+                continue
+            # Skip the source/target's container ancestors (zones the edge
+            # legitimately enters or leaves)
+            anc_id = other_cell.get("parent")
+            ancestors_of_obstacle = set()
+            while anc_id:
+                ancestors_of_obstacle.add(anc_id)
+                anc = cells.get(anc_id)
+                if anc is None:
+                    break
+                anc_id = anc.get("parent")
+            if src.get("id") in ancestors_of_obstacle or tgt.get("id") in ancestors_of_obstacle:
+                continue
+            report.add(
+                "warning",
+                "align",
+                f"edge {cid} ({s_id} → {t_id}) passes through cell {other_id} "
+                f"(label={other_label[:40]!r}). Add entryX/exitX/entryY/exitY anchors to dock the edge "
+                "on the card's edge, OR set edgeStyle=orthogonalEdgeStyle and reposition cells so "
+                "the edge can route around the obstacle.",
+                cell=cid,
+            )
+            break  # one warning per edge is enough; LLM will fix and re-run
+
     return report
 
 

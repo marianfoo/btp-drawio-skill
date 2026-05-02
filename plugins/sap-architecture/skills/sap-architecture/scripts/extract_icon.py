@@ -144,8 +144,14 @@ def main() -> int:
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--x", type=int, default=0)
     ap.add_argument("--y", type=int, default=0)
-    ap.add_argument("--w", type=int, default=64)
-    ap.add_argument("--h", type=int, default=80)
+    # Defaults match the SAP corpus convention: 32x32 is the dominant icon
+    # size (used 224x across the 71 bundled templates), then 48x48 (157x).
+    # The previous default 64x80 caused icons to overlap card text — the
+    # most common visible bug. Override with --w 48 --h 48 only when the
+    # icon is the focal anchor of a zone (e.g. a brand mark beside a
+    # top-left zone label).
+    ap.add_argument("--w", type=int, default=32)
+    ap.add_argument("--h", type=int, default=32)
     ap.add_argument("--id", default="icon1")
     ap.add_argument("--parent", default="1")
     ap.add_argument("--label", default=None, help="Override icon label text")

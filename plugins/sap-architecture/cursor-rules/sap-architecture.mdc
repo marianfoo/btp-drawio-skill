@@ -63,8 +63,29 @@ Each nudge is one iteration:
 These will fail the validator:
 
 - **Dark `pageBackgroundColor`** — error. SAP always uses white/transparent.
+- **Oversized icons** (w>64 or h>64) — warning. SAP corpus standard: 32×32 (most common, 224× across templates), 48×48 (focal anchors only). Default in `extract_icon.py` is now 32×32. Never override above 48.
+- **Icons overlapping card text** — warning. The validator detects an icon whose bounding box covers more than 25% of another card. Two safe placements: (a) tuck the icon INSIDE its parent card with small local x/y, or (b) place it in a dedicated empty region with no neighbor within ~40 px.
+- **Edges passing through unrelated cards** — warning. A naked `<mxCell edge="1" source="A" target="B">` draws a straight diagonal through whatever's in the way. Fix by adding `edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;` (numbers chosen to dock the edge to the relevant side) OR by repositioning source/target so the straight line has no obstacle.
 - **Novelty pill verbs** like `PROMPT`, `ROUTE`, `CONTEXT`, `DELEGATE`, `INVOKE`, `FETCH` — warning. Replace with canonical SAP set: `TRUST`, `Authenticate`, `Authorization`, `A2A`, `MCP`, `ORD`, `HTTPS`, `OData/REST`, `SAML2/OIDC`, `SCIM`, `Identity Lifecycle`.
 - **Multiple SAP logos** beyond ~6 — warning. SAP guidance: "Don't use too many SAP logos in the same diagram. Use text-only elements instead."
+
+## Edge anchor cheat sheet
+
+For docking an edge cleanly between two cards:
+
+```
+A is to the LEFT of B (A→B horizontal):
+  edgeStyle=orthogonalEdgeStyle;
+  exitX=1;exitY=0.5;exitDx=0;exitDy=0;     ← exits A's right edge midpoint
+  entryX=0;entryY=0.5;entryDx=0;entryDy=0; ← enters B's left edge midpoint
+
+A is ABOVE B (A→B vertical):
+  edgeStyle=orthogonalEdgeStyle;
+  exitX=0.5;exitY=1;exitDx=0;exitDy=0;
+  entryX=0.5;entryY=0;entryDx=0;entryDy=0;
+```
+
+Add to all edges: `labelBackgroundColor=default;` so labels render on a white pill regardless of zone fill.
 
 ## Connector color semantics (SAP-mandated)
 

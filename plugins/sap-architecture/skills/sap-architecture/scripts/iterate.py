@@ -174,14 +174,86 @@ def write_diff_html(
     return out_dir / "review.html"
 
 
-def actionable_suggestions(breakdown: dict, ref_fp, cand_fp, raw_diffs: list[str]) -> list[str]:
+def collect_validator_warnings(candidate: Path) -> dict[str, list[str]]:
+    """Run validate.py and group warnings by category for the LLM.
+
+    We treat icon/edge align warnings as the highest-priority feedback for
+    the LLM — they pinpoint exact cell IDs to fix and are the visible
+    failures (oversized icons, icons-on-text, edges-through-cells).
+    """
+    out: dict[str, list[str]] = {"icon_oversized": [], "icon_overlap": [], "edge_through": [], "other": []}
+    rc = subprocess.run(
+        [sys.executable, str(THIS_DIR / "validate.py"), str(candidate), "--json"],
+        capture_output=True, text=True, check=False,
+    )
+    if rc.returncode not in (0, 1):
+        return out
+    try:
+        data = json.loads(rc.stdout)
+    except json.JSONDecodeError:
+        return out
+    if not isinstance(data, list) or not data:
+        return out
+    report = data[0]
+    for w in (report.get("warnings") or []):
+        msg = w.get("msg", "")
+        cell = w.get("cell", "")
+        line = f"[{cell}] {msg}" if cell else msg
+        if "oversized" in msg and "icon" in msg:
+            out["icon_oversized"].append(line)
+        elif "icon" in msg and "overlaps card" in msg:
+            out["icon_overlap"].append(line)
+        elif "edge" in msg and "passes through" in msg:
+            out["edge_through"].append(line)
+        else:
+            out["other"].append(line)
+    return out
+
+
+def actionable_suggestions(breakdown: dict, ref_fp, cand_fp, raw_diffs: list[str], validator_groups: dict[str, list[str]] | None = None) -> list[str]:
     """Pull concrete, single-action suggestions from the score breakdown.
 
-    Each line is one specific thing the LLM should do next. We sort by
-    expected score impact (rough heuristic: dimensions with the biggest
-    weight × biggest gap get listed first).
+    Validator-detected layout failures (oversized icons, icon overlaps,
+    edges through boxes) get the top of the list because they are
+    visually obvious to the user even when the score is still high.
     """
     weighted_gaps: list[tuple[float, str]] = []
+
+    # Validator-detected layout failures rank highest — they are the visible
+    # bugs the user will spot immediately ("icon is huge", "arrow goes
+    # through a box"), even when the structural fingerprint score is OK.
+    if validator_groups:
+        if validator_groups["icon_oversized"]:
+            n = len(validator_groups["icon_oversized"])
+            sample = validator_groups["icon_oversized"][0]
+            weighted_gaps.append((
+                1000.0,  # always first
+                f"Resize {n} oversized icon(s) to 32×32 (most common in SAP corpus) "
+                f"or 48×48 for focal anchors. Use --w 32 --h 32 with extract_icon.py, "
+                f"or edit `<mxGeometry width=\"...\" height=\"...\">` directly. "
+                f"Example: {sample}"
+            ))
+        if validator_groups["icon_overlap"]:
+            n = len(validator_groups["icon_overlap"])
+            sample = validator_groups["icon_overlap"][0]
+            weighted_gaps.append((
+                950.0,
+                f"Move {n} icon(s) off the cards they overlap. Either tuck the icon "
+                f"INSIDE its parent card (set parent attribute and small x/y inside the card), "
+                f"or relocate it to an empty region of the canvas. Example: {sample}"
+            ))
+        if validator_groups["edge_through"]:
+            n = len(validator_groups["edge_through"])
+            sample = validator_groups["edge_through"][0]
+            weighted_gaps.append((
+                900.0,
+                f"Reroute {n} edge(s) so they don't cross unrelated cards. Two fixes "
+                f"per edge: (a) add `edgeStyle=orthogonalEdgeStyle;` to the edge style + "
+                f"`exitX=0/0.5/1;exitY=0/0.5/1;entryX=...;entryY=...;exitDx=0;exitDy=0;` "
+                f"to dock to a specific edge of the source/target; OR (b) reposition the "
+                f"source/target cells so the straight line has no obstacle. "
+                f"Example: {sample}"
+            ))
 
     weights = {
         "page_bg": 1.5, "canvas": 1.0, "zones": 1.5, "zone_depth": 1.0,
@@ -368,7 +440,10 @@ def main() -> int:
             result.score, result.breakdown, result.diffs, []
         )
 
-    suggestions = actionable_suggestions(result.breakdown, ref_fp, cand_fp, result.diffs)
+    validator_groups = collect_validator_warnings(args.candidate)
+    suggestions = actionable_suggestions(
+        result.breakdown, ref_fp, cand_fp, result.diffs, validator_groups
+    )
 
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(),
