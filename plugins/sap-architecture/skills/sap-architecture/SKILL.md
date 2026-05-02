@@ -140,6 +140,39 @@ You scaffolded from a SAP template in step 2. Now make the *minimum* edits requi
 
 For complex scenarios that require more than label edits, switch into **Nudge mode** below — it converges via small, scored steps with vision feedback, and is much more reliable than trying to land everything in one pass. The manual draw.io workflow (`references/manual-workflow.md`) remains the safety net for the last 20% of polish.
 
+### 4a. Study the SAP design recipe before editing
+
+After scaffold, you will get a `📐 SAP design recipe of <template>.drawio` block printed to stdout. Read it. It is a precomputed, structural summary of the SAP template you just copied: how many zones, what colors, icon sizes, pill vocabulary, edge anchor proportions, detected layout patterns. This is what makes it look like a SAP diagram.
+
+The recipe answers questions like:
+
+- *How many top-level zones does this template have, and what colors are they?* (so you don't add or remove zones blindly)
+- *What pill vocabulary is canonical here?* (e.g. RA0029 templates use TRUST/Authenticate/A2A/MCP/ORD; RA0019 IAM templates add SCIM/SAML2/OIDC/Identity Lifecycle)
+- *How many of the edges in this template use `entryX/exitX` anchors?* (if the SAP template anchors 43/46 edges and yours anchors 0/11, you've found the bug)
+- *Which icon sizes does this template use?* (don't override `extract_icon.py` defaults to 80×80 if the SAP recipe says 32×32)
+
+If your scenario isn't a perfect match for any one template — for example you're combining patterns from two SAP architectures — use the `find_pattern.py` script to discover SAP templates that show similar combinations:
+
+```bash
+# Free-text query
+python3 .claude/skills/sap-architecture/scripts/find_pattern.py "joule purple zone with bottom identity flow"
+
+# By required pill vocabulary
+python3 .claude/skills/sap-architecture/scripts/find_pattern.py --pill TRUST --pill A2A --pill MCP
+
+# By structural shape
+python3 .claude/skills/sap-architecture/scripts/find_pattern.py --zones 4 --icons-min 8
+
+# By detected pattern tag
+python3 .claude/skills/sap-architecture/scripts/find_pattern.py --pattern subaccount-nested-in-btp
+
+# Discover what tags exist
+python3 .claude/skills/sap-architecture/scripts/find_pattern.py --list-patterns
+python3 .claude/skills/sap-architecture/scripts/find_pattern.py --list-pills
+```
+
+The principle: **if SAP has done it (or something similar), copy what they did**. The 71-template registry is the ground truth. When you need a feature your scaffolded template doesn't have, find the SAP template that has it and copy *the same approach* — same icon size, same pill verb, same edge anchor pattern, same color role. Don't improvise.
+
 ### 4b. Nudge mode — iterate with vision + scored feedback (HIGHLY RECOMMENDED)
 
 When you (the LLM) are running inside Cursor or Claude Code with image-reading capability, prefer this loop over trying to one-shot the diagram:
@@ -316,6 +349,8 @@ sap-architecture/
     ├── render.py                  — drawio CLI wrapper (export to PNG/SVG/PDF)
     ├── render_compare.py          — render candidate + reference, build side-by-side HTML review
     ├── iterate.py                 — Nudge-mode loop: render+score+structured next-steps for the LLM
+    ├── profile_template.py        — extract a deep design profile from one .drawio (or build the registry)
+    ├── find_pattern.py            — search the SAP template registry by free text, pills, structural counts, or patterns
     ├── compare.py                 — pairwise fingerprint score against one reference
     ├── score_corpus.py            — candidate → best score across all references
     ├── eval_corpus.py             — opt-in Ollama corpus evaluation loop

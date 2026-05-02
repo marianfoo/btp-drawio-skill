@@ -368,6 +368,24 @@ def write_history(cache: Path, entry: dict, max_keep: int = 20) -> None:
     p.write_text(json.dumps(items, indent=2), encoding="utf-8")
 
 
+def load_template_recipe(target: Path) -> dict | None:
+    """Look up the chosen template's deep design profile from the registry.
+
+    Returns the profile dict (zones, icons, pills, edges, patterns, etc.) the
+    LLM should match when relabeling. Returns None if the registry isn't built
+    (run `profile_template.py --build-registry` first) or if `target` isn't
+    in the bundled corpus (e.g. an externally-pinned reference).
+    """
+    registry_path = THIS_DIR.parent / "assets" / "reference-examples" / "template-profiles.json"
+    if not registry_path.exists():
+        return None
+    try:
+        reg = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return (reg.get("templates") or {}).get(target.name)
+
+
 def fmt_delta(curr: float, prev: float | None) -> str:
     if prev is None:
         return "(first iteration)"
@@ -472,6 +490,9 @@ def main() -> int:
         print(json.dumps(out, indent=2))
         return 0 if out["passes"] else 1
 
+    # Look up the chosen target's design recipe from the precomputed registry
+    target_recipe = load_template_recipe(target)
+
     # Human + LLM friendly text output
     print()
     print("─── SAP DIAGRAM ITERATION ───")
@@ -486,6 +507,44 @@ def main() -> int:
     if diff_html:
         print(f"   side-by-side HTML : {diff_html}")
     print()
+
+    if target_recipe:
+        print("🎯 SAP design recipe of your target template — preserve these patterns:")
+        struct = target_recipe.get("structure_summary", {})
+        if struct:
+            print(
+                f"   structure : {struct.get('top_level_zones', 0)} top-level zones, "
+                f"{struct.get('nested_zones', 0)} nested, "
+                f"{struct.get('cards', 0)} cards, "
+                f"{struct.get('icons', 0)} icons, "
+                f"{struct.get('pills', 0)} pills, "
+                f"{struct.get('edges', 0)} edges"
+            )
+        if target_recipe.get("icon_sizes"):
+            sizes = ", ".join(f"{n}×{s}" for s, n in list(target_recipe["icon_sizes"].items())[:4])
+            print(f"   icon sizes: {sizes} — match these, do NOT exceed 48×48 unless ref does")
+        if target_recipe.get("pill_vocab"):
+            vocab = ", ".join(f"{p!r}" for p in target_recipe["pill_vocab"][:8])
+            print(f"   pill vocab: {vocab}")
+        eq = target_recipe.get("edge_quality", {})
+        if eq.get("total"):
+            print(
+                f"   edges     : {eq['total']} total, "
+                f"{eq.get('with_anchors', 0)} use entryX/exitX anchors, "
+                f"{eq.get('orthogonal', 0)} orthogonalEdgeStyle "
+                f"(your edges should follow the same proportions to avoid arrows-through-cards)"
+            )
+        if target_recipe.get("detected_patterns"):
+            print(f"   patterns  : {', '.join(target_recipe['detected_patterns'][:6])}")
+        zones = target_recipe.get("zones", [])
+        top_zones = [z for z in zones if z.get("parent_id") in (None, "1")]
+        if top_zones:
+            zone_summary = "; ".join(
+                f"{z.get('label', '?').strip() or '(unlabeled)':<30s} [{z.get('color_role', '?')}]"
+                for z in top_zones[:6]
+            )
+            print(f"   top zones : {zone_summary}")
+        print()
 
     # Lowest-scoring dimensions (top 5)
     print("⚠ Lowest-scoring dimensions (fix worst first):")

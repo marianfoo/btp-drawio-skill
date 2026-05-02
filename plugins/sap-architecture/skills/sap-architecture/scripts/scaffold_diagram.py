@@ -167,6 +167,46 @@ def main() -> int:
         print(f"scaffolded {dest} from {chosen.name}")
         if args.diagram_name and not renamed:
             print(f"warning: --diagram-name {args.diagram_name!r} did not match a <diagram> element")
+
+        # Print the SAP design recipe of the chosen template — the patterns
+        # the LLM (or human) should preserve when relabeling.
+        recipe = _load_recipe(chosen)
+        if recipe:
+            print()
+            print(f"📐 SAP design recipe of {chosen.name} — preserve these patterns when editing:")
+            struct = recipe.get("structure_summary", {})
+            if struct:
+                print(
+                    f"   structure : {struct.get('top_level_zones', 0)} top zones, "
+                    f"{struct.get('nested_zones', 0)} nested, "
+                    f"{struct.get('cards', 0)} cards, "
+                    f"{struct.get('icons', 0)} icons, "
+                    f"{struct.get('pills', 0)} pills, "
+                    f"{struct.get('edges', 0)} edges"
+                )
+            if recipe.get("icon_sizes"):
+                sizes = ", ".join(f"{n}×{s}" for s, n in list(recipe["icon_sizes"].items())[:4])
+                print(f"   icon sizes: {sizes}  (do NOT exceed 48×48 unless ref does)")
+            if recipe.get("pill_vocab"):
+                vocab = ", ".join(f"{p!r}" for p in recipe["pill_vocab"][:8])
+                print(f"   pill vocab: {vocab}")
+            eq = recipe.get("edge_quality", {})
+            if eq.get("total"):
+                print(
+                    f"   edges     : {eq['total']} total, "
+                    f"{eq.get('with_anchors', 0)} use entryX/exitX anchors, "
+                    f"{eq.get('orthogonal', 0)} orthogonalEdgeStyle"
+                )
+            top_zones = [z for z in (recipe.get("zones") or []) if z.get("parent_id") in (None, "1")]
+            if top_zones:
+                summary = "; ".join(
+                    f"{(z.get('label') or '(unlabeled)').strip()[:30]} [{z.get('color_role', '?')}]"
+                    for z in top_zones[:5]
+                )
+                print(f"   top zones : {summary}")
+            if recipe.get("detected_patterns"):
+                print(f"   patterns  : {', '.join(recipe['detected_patterns'][:6])}")
+
         if candidates:
             print()
             print("alternative templates (open one if the chosen one is the wrong family):")
@@ -174,11 +214,23 @@ def main() -> int:
                 print(f"  {i}. {c.score:5.1f}  {Path(c.path).name}")
         print()
         print("Next steps:")
-        print(f"  1. Edit {dest.name} surgically — change labels, swap services, keep canvas/zones/palette")
+        print(f"  1. Read the recipe above. Edit {dest.name} surgically: change labels and add/swap services, but keep canvas/zones/palette/pills exactly as the SAP template defines.")
         print(f"  2. python3 {SCRIPTS_DIR}/autofix.py --write {dest}")
         print(f"  3. python3 {SCRIPTS_DIR}/validate.py {dest}")
-        print(f"  4. python3 {SCRIPTS_DIR}/compare.py {chosen} {dest}")
+        print(f"  4. python3 {SCRIPTS_DIR}/iterate.py {dest}   ← shows score + visual feedback for nudge mode")
     return 0
+
+
+def _load_recipe(chosen: Path) -> dict | None:
+    """Load the chosen template's deep design profile from the precomputed registry."""
+    registry_path = ASSETS_DIR / "template-profiles.json"
+    if not registry_path.exists():
+        return None
+    try:
+        reg = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return (reg.get("templates") or {}).get(chosen.name)
 
 
 if __name__ == "__main__":

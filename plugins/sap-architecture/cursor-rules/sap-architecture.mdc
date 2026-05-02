@@ -30,17 +30,29 @@ Then run, in this exact order:
    ```
    Read the printed alternates. If the chosen template is wrong family, re-run with `--template <correct>.drawio --force`.
 
-2. **Surgical relabel.** Open the destination file with the Read tool, find labels that need swapping for the user's scenario (titles, service-card values, zone names), and use Edit to change ONLY those strings. Do NOT rewrite the file. Do NOT touch canvas size, zone hierarchy, network divider, SAP logos, footer, or identity-flow placement.
+2. **READ THE PRINTED `📐 SAP design recipe` BLOCK.** scaffold_diagram.py prints a precomputed structural summary of the chosen SAP template right after copying: how many top-level zones with what colors, icon sizes, pill vocabulary, edge anchor proportions, detected layout patterns. **This is what makes it look like SAP.** Your job in step 4 is to keep these numbers and patterns intact while changing only labels and a few services.
 
-3. **Autofix + iterate (mandatory):**
+3. **Surgical relabel.** Open the destination file with the Read tool, find labels that need swapping for the user's scenario (titles, service-card values, zone names), and use Edit to change ONLY those strings. Do NOT rewrite the file. Do NOT touch canvas size, zone hierarchy, network divider, SAP logos, footer, or identity-flow placement. If the recipe says 5 top zones / 14 icons / 13 pills / 46 edges, your edit count for those should be ~0 — only labels move.
+
+4. **If you need a feature the chosen template doesn't have, search the SAP corpus first** instead of inventing one:
+   ```bash
+   python3 $SKILL/find_pattern.py "what you need in plain English"
+   python3 $SKILL/find_pattern.py --pill TRUST --pill A2A --pill MCP        # by required pill verbs
+   python3 $SKILL/find_pattern.py --zones 4 --icons-min 8                   # by structural shape
+   python3 $SKILL/find_pattern.py --pattern subaccount-nested-in-btp        # by tagged pattern
+   python3 $SKILL/find_pattern.py --list-patterns                           # discover all tags
+   ```
+   Copy the approach SAP used in the matching template (icon sizes, pill colors, edge anchors). **If SAP did it, copy that. If SAP did something similar, copy the closest pattern.** Improvise only as a last resort, and when you must, match the structural numbers from the recipe.
+
+5. **Autofix + iterate (mandatory):**
    ```bash
    python3 $SKILL/autofix.py --write <destination>.drawio
    python3 $SKILL/iterate.py <destination>.drawio
    ```
 
-4. **Read both PNGs** that `iterate.py` printed under `.cache/sap-architecture-iter/<stem>/`. Use your image-reading tool. The candidate PNG is what you just produced; the reference PNG is the SAP target you should converge toward.
+6. **Read both PNGs** that `iterate.py` printed under `.cache/sap-architecture-iter/<stem>/`. Use your image-reading tool. The candidate PNG is what you just produced; the reference PNG is the SAP target you should converge toward. The iterate output also includes the same `🎯 SAP design recipe` block so you can compare your edits against the canonical structural numbers.
 
-5. **Pick ONE suggestion** from the printed "Next concrete edit" list. Make ONE edit. Re-run autofix + iterate. Loop until score ≥ 90 OR until the user gives a follow-up nudge.
+7. **Pick ONE suggestion** from the printed "Next concrete edit" list. Make ONE edit. Re-run autofix + iterate. Loop until score ≥ 90 OR until the user gives a follow-up nudge.
 
 ## Nudge mode — the user types something like "Joule should be on the left"
 
