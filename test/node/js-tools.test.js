@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { resolvedPythonCommand } from "../../lib/python-tools.js";
 import { pyRound, snap10 } from "../../src/core/round.js";
 import { parseCompareStyle, parseValidateStyle } from "../../src/core/styles.js";
+import { canonicalizeXml, elementsByTag, parseXml } from "../../src/core/xml.js";
 
 const cli = new URL("../../bin/btp-drawio.js", import.meta.url).pathname;
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -16,7 +17,8 @@ const referenceDir = join(repoRoot, "plugins", "sap-architecture", "skills", "sa
 function run(args, env = {}) {
   return execFileSync("node", [cli, ...args], {
     encoding: "utf8",
-    env: { ...process.env, ...env }
+    env: { ...process.env, ...env },
+    stdio: ["ignore", "pipe", "pipe"]
   });
 }
 
@@ -37,6 +39,16 @@ function collectDrawioFiles(dir) {
   return out.sort();
 }
 
+function firstLabeledElementId(xml) {
+  for (const elem of elementsByTag(parseXml(xml), "*")) {
+    const id = elem.getAttribute("id");
+    if (id && (elem.hasAttribute("value") || elem.hasAttribute("label") || elem.hasAttribute("name"))) {
+      return id;
+    }
+  }
+  throw new Error("fixture has no labeled element with an id");
+}
+
 test("pyRound matches Python half-even rounding traps", () => {
   assert.equal(pyRound(2.5), 2);
   assert.equal(pyRound(3.5), 4);
@@ -47,6 +59,11 @@ test("pyRound matches Python half-even rounding traps", () => {
   assert.equal(pyRound(-13.5), -14);
   assert.equal(snap10(-134.9999999999999), -130);
   assert.equal(snap10(-135), -140);
+});
+
+test("canonicalizeXml compares XML structure instead of serializer whitespace", () => {
+  assert.equal(canonicalizeXml('<mxCell b="2" a="1" />'), canonicalizeXml('<mxCell a="1" b="2"/>'));
+  assert.equal(canonicalizeXml('<root><child value="A&#10;B" /></root>'), canonicalizeXml('<root><child value="A&#xA;B"/></root>'));
 });
 
 test("style parser matches both Python parsers across bundled references", () => {
@@ -98,6 +115,24 @@ test("ported extract tools run without Python and keep icon guard behavior", () 
   assert.match(workZone, /Standard Edition/);
 });
 
+test("ported extract tools match Python semantically despite XML serializer whitespace", () => {
+  const cases = [
+    ["extract-icon", ["Cloud Connector", "--id", "cc", "--x", "12", "--y", "19"]],
+    ["extract-icon", ["Build Work Zone", "--id", "wz"]],
+    ["extract-asset", ["on-premise-sap", "--kind", "generic-icon", "--id", "backend"]],
+    ["extract-asset", ["sap-destination-service", "--kind", "btp-service-icon", "--id", "dest"]]
+  ];
+
+  for (const [command, args] of cases) {
+    const pyOut = run([command, ...args], { BTP_DRAWIO_ENGINE: "python" });
+    const jsOut = run([command, ...args], {
+      BTP_DRAWIO_ENGINE: "js",
+      BTP_DRAWIO_PYTHON: "definitely-not-python"
+    });
+    assert.equal(canonicalizeXml(jsOut), canonicalizeXml(pyOut), `${command} ${args.join(" ")}`);
+  }
+});
+
 test("ported relabel supports inline JSON and preserves drawio output validity", () => {
   const dir = mkdtempSync(join(tmpdir(), "btp-drawio-js-relabel-"));
   const source = join(dir, "source.drawio");
@@ -123,6 +158,37 @@ test("ported relabel supports inline JSON and preserves drawio output validity",
 
   const validate = run(["validate", out], { BTP_DRAWIO_ENGINE: "python" });
   assert.match(validate, /OK/);
+});
+
+test("ported relabel matches Python semantically across all bundled references", () => {
+  const dir = mkdtempSync(join(tmpdir(), "btp-drawio-js-relabel-corpus-"));
+  const files = collectDrawioFiles(referenceDir);
+  assert.equal(files.length, 71);
+
+  for (const [index, source] of files.entries()) {
+    const fixtureDir = join(dir, String(index));
+    mkdirSync(fixtureDir);
+    const pyFile = join(fixtureDir, "python.drawio");
+    const jsFile = join(fixtureDir, "js.drawio");
+    const pyOut = join(fixtureDir, "python-out.drawio");
+    const jsOut = join(fixtureDir, "js-out.drawio");
+    const mappingFile = join(fixtureDir, "mapping.json");
+    const original = readFileSync(source, "utf8");
+    const targetId = firstLabeledElementId(original);
+    const mapping = { ids: { [targetId]: `Parity Replacement ${index}` } };
+
+    writeFileSync(pyFile, original);
+    writeFileSync(jsFile, original);
+    writeFileSync(mappingFile, JSON.stringify(mapping));
+
+    run(["relabel", pyFile, mappingFile, "--out", pyOut], { BTP_DRAWIO_ENGINE: "python" });
+    const jsRun = spawn(["relabel", jsFile, mappingFile, "--out", jsOut], {
+      BTP_DRAWIO_ENGINE: "js",
+      BTP_DRAWIO_PYTHON: "definitely-not-python"
+    });
+    assert.equal(jsRun.status, 0, `${basename(source)}\n${jsRun.stderr}`);
+    assert.equal(canonicalizeXml(readFileSync(jsOut, "utf8")), canonicalizeXml(readFileSync(pyOut, "utf8")), basename(source));
+  }
 });
 
 test("ported autofix matches Python output and runs without Python", () => {
