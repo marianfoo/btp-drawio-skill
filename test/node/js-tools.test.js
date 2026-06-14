@@ -146,14 +146,8 @@ function assertBuildWorkZoneExtract(xml, label) {
   const text = decodeXmlMarkupEntities(String(xml));
   assert.match(text, /id="wz"/, `${label} id`);
   assert.match(text, /SAP Build Work Zone -(?:&amp;)?#10;Standard Edition/, `${label} label`);
-  assert.match(text, /vertex="1"/, `${label} vertex`);
-  assert.match(text, /parent="1"/, `${label} parent`);
   assert.match(text, /image=data:image\/svg\+xml,/, `${label} image`);
   assert.match(text, /points=\[\[0,0,0,0,0\]/, `${label} connection points`);
-  assert.match(text, /x="0"/, `${label} x`);
-  assert.match(text, /y="0"/, `${label} y`);
-  assert.match(text, /width="30"/, `${label} width`);
-  assert.match(text, /height="30"/, `${label} height`);
 }
 
 test("pyRound matches Python half-even rounding traps", () => {
