@@ -5,6 +5,7 @@ import { basename, dirname, join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
+import { decodeHTML } from "entities";
 import { resolvedPythonCommand } from "../../lib/python-tools.js";
 import { pyRound, snap10 } from "../../src/core/round.js";
 import { parseCompareStyle, parseValidateStyle } from "../../src/core/styles.js";
@@ -69,12 +70,17 @@ function firstLabeledElementId(xml) {
   throw new Error("fixture has no labeled element with an id");
 }
 
+function normalizeXmlFragmentOutput(xml) {
+  const text = String(xml).trim();
+  return text.startsWith("&lt;") ? decodeHTML(text) : text;
+}
+
 function canonicalizeXmlIgnoringEmbeddedSvgData(xml) {
-  return canonicalizeXml(String(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__"));
+  return canonicalizeXml(normalizeXmlFragmentOutput(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__"));
 }
 
 function embeddedSvgDataCount(xml) {
-  return [...String(xml).matchAll(/image=data:image\/svg\+xml,([^;"]+)/g)].length;
+  return [...normalizeXmlFragmentOutput(xml).matchAll(/image=data:image\/svg\+xml,([^;"]+)/g)].length;
 }
 
 test("pyRound matches Python half-even rounding traps", () => {
@@ -92,6 +98,14 @@ test("pyRound matches Python half-even rounding traps", () => {
 test("canonicalizeXml compares XML structure instead of serializer whitespace", () => {
   assert.equal(canonicalizeXml('<mxCell b="2" a="1" />'), canonicalizeXml('<mxCell a="1" b="2"/>'));
   assert.equal(canonicalizeXml('<root><child value="A&#10;B" /></root>'), canonicalizeXml('<root><child value="A&#xA;B"/></root>'));
+  assert.equal(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&lt;mxCell id="a" value="One" /&gt;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="One" id="a"/>')
+  );
+  assert.notEqual(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&lt;mxCell id="a" value="One" /&gt;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="Two" id="a"/>')
+  );
 });
 
 test("style parser matches both Python parsers across bundled references", () => {

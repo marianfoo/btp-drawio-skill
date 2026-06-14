@@ -37,11 +37,15 @@ function removeGeneratedCaches(dir) {
 
 removeGeneratedCaches(join(stage, "plugins"));
 
-const install = spawnSync("npm", ["install", "--omit=dev", "--ignore-scripts"], {
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const install = spawnSync(npmCommand, ["install", "--omit=dev", "--ignore-scripts"], {
   cwd: stage,
   stdio: "inherit"
 });
 if (install.status !== 0) {
+  if (install.error) {
+    console.error(`failed to run ${npmCommand}: ${install.error.message}`);
+  }
   process.exit(install.status ?? 1);
 }
 
