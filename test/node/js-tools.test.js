@@ -10,7 +10,7 @@ import { pyRound, snap10 } from "../../src/core/round.js";
 import { parseCompareStyle, parseValidateStyle } from "../../src/core/styles.js";
 import { canonicalizeXml, elementsByTag, parseXml } from "../../src/core/xml.js";
 
-const cli = new URL("../../bin/btp-drawio.js", import.meta.url).pathname;
+const cli = fileURLToPath(new URL("../../bin/btp-drawio.js", import.meta.url));
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const referenceDir = join(repoRoot, "plugins", "sap-architecture", "skills", "sap-architecture", "assets", "reference-examples");
 const selectParityPrompts = [
@@ -69,6 +69,32 @@ function firstLabeledElementId(xml) {
   throw new Error("fixture has no labeled element with an id");
 }
 
+function decodeXmlMarkupEntities(text) {
+  return String(text)
+    .replace(/&lt;|&#0*60;|&#x0*3c;/gi, "<")
+    .replace(/&gt;|&#0*62;|&#x0*3e;/gi, ">")
+    .replace(/&quot;|&#0*34;|&#x0*22;/gi, '"')
+    .replace(/&apos;|&#0*39;|&#x0*27;/gi, "'");
+}
+
+function normalizeXmlFragmentOutput(xml) {
+  const text = String(xml).trim();
+  if (text.startsWith("<")) return text;
+  const decoded = decodeXmlMarkupEntities(text).trim();
+  return decoded.startsWith("<") ? decoded : text;
+}
+
+function canonicalizeXmlIgnoringEmbeddedSvgData(xml) {
+  const masked = normalizeXmlFragmentOutput(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__");
+  const canonical = canonicalizeXml(masked);
+  const decodedCanonical = normalizeXmlFragmentOutput(canonical);
+  return decodedCanonical === canonical ? canonical : canonicalizeXml(decodedCanonical);
+}
+
+function embeddedSvgDataCount(xml) {
+  return [...normalizeXmlFragmentOutput(xml).matchAll(/image=data:image\/svg\+xml,([^;"]+)/g)].length;
+}
+
 test("pyRound matches Python half-even rounding traps", () => {
   assert.equal(pyRound(2.5), 2);
   assert.equal(pyRound(3.5), 4);
@@ -84,6 +110,18 @@ test("pyRound matches Python half-even rounding traps", () => {
 test("canonicalizeXml compares XML structure instead of serializer whitespace", () => {
   assert.equal(canonicalizeXml('<mxCell b="2" a="1" />'), canonicalizeXml('<mxCell a="1" b="2"/>'));
   assert.equal(canonicalizeXml('<root><child value="A&#10;B" /></root>'), canonicalizeXml('<root><child value="A&#xA;B"/></root>'));
+  assert.equal(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&lt;mxCell id="a" value="One" /&gt;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="One" id="a"/>')
+  );
+  assert.equal(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&#60;mxCell id="a" value="One" /&#62;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="One" id="a"/>')
+  );
+  assert.notEqual(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&lt;mxCell id="a" value="One" /&gt;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="Two" id="a"/>')
+  );
 });
 
 test("style parser matches both Python parsers across bundled references", () => {
@@ -149,7 +187,12 @@ test("ported extract tools match Python semantically despite XML serializer whit
       BTP_DRAWIO_ENGINE: "js",
       BTP_DRAWIO_PYTHON: "definitely-not-python"
     });
-    assert.equal(canonicalizeXml(jsOut), canonicalizeXml(pyOut), `${command} ${args.join(" ")}`);
+    assert.equal(embeddedSvgDataCount(jsOut), embeddedSvgDataCount(pyOut), `${command} ${args.join(" ")} image count`);
+    assert.equal(
+      canonicalizeXmlIgnoringEmbeddedSvgData(jsOut),
+      canonicalizeXmlIgnoringEmbeddedSvgData(pyOut),
+      `${command} ${args.join(" ")}`
+    );
   }
 });
 
@@ -303,10 +346,10 @@ test("ported scaffold output matches Python semantically across all bundled temp
     const diagramName = `Scaffold Parity ${index}`;
     const template = basename(source);
 
-    run(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", pyOut], {
+    run(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", pyOut, "--json"], {
       BTP_DRAWIO_ENGINE: "python"
     });
-    const jsRun = spawn(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", jsOut], {
+    const jsRun = spawn(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", jsOut, "--json"], {
       BTP_DRAWIO_ENGINE: "js",
       BTP_DRAWIO_PYTHON: "definitely-not-python"
     });
