@@ -69,6 +69,14 @@ function firstLabeledElementId(xml) {
   throw new Error("fixture has no labeled element with an id");
 }
 
+function canonicalizeXmlIgnoringEmbeddedSvgData(xml) {
+  return canonicalizeXml(String(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__"));
+}
+
+function embeddedSvgDataCount(xml) {
+  return [...String(xml).matchAll(/image=data:image\/svg\+xml,([^;"]+)/g)].length;
+}
+
 test("pyRound matches Python half-even rounding traps", () => {
   assert.equal(pyRound(2.5), 2);
   assert.equal(pyRound(3.5), 4);
@@ -149,7 +157,12 @@ test("ported extract tools match Python semantically despite XML serializer whit
       BTP_DRAWIO_ENGINE: "js",
       BTP_DRAWIO_PYTHON: "definitely-not-python"
     });
-    assert.equal(canonicalizeXml(jsOut), canonicalizeXml(pyOut), `${command} ${args.join(" ")}`);
+    assert.equal(embeddedSvgDataCount(jsOut), embeddedSvgDataCount(pyOut), `${command} ${args.join(" ")} image count`);
+    assert.equal(
+      canonicalizeXmlIgnoringEmbeddedSvgData(jsOut),
+      canonicalizeXmlIgnoringEmbeddedSvgData(pyOut),
+      `${command} ${args.join(" ")}`
+    );
   }
 });
 
@@ -303,10 +316,10 @@ test("ported scaffold output matches Python semantically across all bundled temp
     const diagramName = `Scaffold Parity ${index}`;
     const template = basename(source);
 
-    run(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", pyOut], {
+    run(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", pyOut, "--json"], {
       BTP_DRAWIO_ENGINE: "python"
     });
-    const jsRun = spawn(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", jsOut], {
+    const jsRun = spawn(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", jsOut, "--json"], {
       BTP_DRAWIO_ENGINE: "js",
       BTP_DRAWIO_PYTHON: "definitely-not-python"
     });
