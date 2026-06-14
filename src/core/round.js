@@ -1,20 +1,19 @@
 export function pyRound(value, ndigits = 0) {
   const factor = 10 ** ndigits;
   const scaled = value * factor;
-  const sign = Math.sign(scaled) || 1;
-  const abs = Math.abs(scaled);
-  const floor = Math.floor(abs);
-  const diff = abs - floor;
-  const epsilon = 1e-12;
+  const floor = Math.floor(scaled);
+  const diff = scaled - floor;
 
   let rounded;
-  if (Math.abs(diff - 0.5) <= epsilon) {
-    rounded = floor % 2 === 0 ? floor : floor + 1;
+  if (diff < 0.5) {
+    rounded = floor;
+  } else if (diff > 0.5) {
+    rounded = floor + 1;
   } else {
-    rounded = Math.round(abs);
+    rounded = floor % 2 === 0 ? floor : floor + 1;
   }
 
-  const result = (sign * rounded) / factor;
+  const result = rounded / factor;
   return ndigits === 0 ? Object.is(result, -0) ? 0 : result : Number(result.toFixed(ndigits));
 }
 

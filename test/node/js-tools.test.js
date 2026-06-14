@@ -1,12 +1,12 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { resolvedPythonCommand } from "../../lib/python-tools.js";
-import { pyRound } from "../../src/core/round.js";
+import { pyRound, snap10 } from "../../src/core/round.js";
 import { parseCompareStyle, parseValidateStyle } from "../../src/core/styles.js";
 
 const cli = new URL("../../bin/btp-drawio.js", import.meta.url).pathname;
@@ -43,6 +43,10 @@ test("pyRound matches Python half-even rounding traps", () => {
   assert.equal(pyRound(0.05, 1), 0);
   assert.equal(pyRound(0.15, 1), 0.2);
   assert.equal(pyRound(1.25, 1), 1.2);
+  assert.equal(pyRound(-13.49999999999999), -13);
+  assert.equal(pyRound(-13.5), -14);
+  assert.equal(snap10(-134.9999999999999), -130);
+  assert.equal(snap10(-135), -140);
 });
 
 test("style parser matches both Python parsers across bundled references", () => {
@@ -145,6 +149,30 @@ test("ported autofix matches Python output and runs without Python", () => {
     BTP_DRAWIO_PYTHON: "definitely-not-python"
   });
   assert.match(secondRun, /no fixes needed/);
+});
+
+test("ported autofix matches Python across all bundled references", () => {
+  const dir = mkdtempSync(join(tmpdir(), "btp-drawio-js-autofix-corpus-"));
+  const files = collectDrawioFiles(referenceDir);
+  assert.equal(files.length, 71);
+
+  for (const [index, source] of files.entries()) {
+    const fixtureDir = join(dir, String(index));
+    mkdirSync(fixtureDir);
+    const pyFile = join(fixtureDir, "python.drawio");
+    const jsFile = join(fixtureDir, "js.drawio");
+    const original = readFileSync(source, "utf8");
+    writeFileSync(pyFile, original);
+    writeFileSync(jsFile, original);
+
+    run(["autofix", pyFile, "--write"], { BTP_DRAWIO_ENGINE: "python" });
+    const jsRun = spawn(["autofix", jsFile, "--write"], {
+      BTP_DRAWIO_ENGINE: "js",
+      BTP_DRAWIO_PYTHON: "definitely-not-python"
+    });
+    assert.equal(jsRun.status, 0, `${basename(source)}\n${jsRun.stderr}`);
+    assert.equal(readFileSync(jsFile, "utf8"), readFileSync(pyFile, "utf8"), basename(source));
+  }
 });
 
 test("ported select/scaffold choose the same top template as Python oracle", () => {
