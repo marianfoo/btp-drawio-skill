@@ -1,11 +1,28 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { checkPython, packageRoot, runPython, toArgs } from "../lib/python-tools.js";
+import { checkPython, missingPythonMessage, packageRoot, runPython, toArgs } from "../lib/python-tools.js";
 
 const diagramPath = z.string().min(1).describe("Local .drawio path");
+const assetKind = z
+  .enum([
+    "annotation-interface",
+    "area-shape",
+    "btp-service-icon",
+    "connector",
+    "default-shape",
+    "essential-shape",
+    "generic-icon",
+    "number-marker",
+    "sap-brand-name",
+    "text-element"
+  ])
+  .optional();
 
 function textResult(result) {
   const text = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join("\n");
@@ -15,9 +32,45 @@ function textResult(result) {
   };
 }
 
+function errorResult(text) {
+  return {
+    content: [{ type: "text", text }],
+    isError: true
+  };
+}
+
 async function runTool(script, args, timeoutMs = 120_000) {
   const result = await runPython(script, args, { timeoutMs });
   return textResult(result);
+}
+
+async function withRelabelMapping({ mapping, mappingJson }, callback) {
+  if (!mapping && !mappingJson) {
+    return errorResult("Pass either mapping (path or inline JSON object string) or mappingJson.");
+  }
+  if (mapping && mappingJson) {
+    return errorResult("Pass either mapping or mappingJson, not both.");
+  }
+
+  const inline = mappingJson || (mapping?.trim().startsWith("{") ? mapping : null);
+  if (!inline) {
+    return callback(mapping);
+  }
+
+  try {
+    JSON.parse(inline);
+  } catch (error) {
+    return errorResult(`Inline relabel mapping is not valid JSON: ${error.message}`);
+  }
+
+  const dir = await mkdtemp(join(tmpdir(), "btp-drawio-relabel-"));
+  const path = join(dir, "mapping.json");
+  try {
+    await writeFile(path, inline, "utf8");
+    return await callback(path);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 export async function main() {
@@ -42,6 +95,7 @@ export async function main() {
               {
                 packageRoot,
                 python: python || null,
+                pythonError: python ? null : missingPythonMessage(),
                 drawioCli: process.env.DRAWIO_CLI || null
               },
               null,
@@ -116,26 +170,27 @@ export async function main() {
   server.registerTool(
     "btp_drawio_validate",
     {
-      description: "Validate a .drawio file for SAP style and structural issues.",
+      description: "Validate a .drawio file for SAP style and structural issues. Returns JSON by default for MCP clients.",
       inputSchema: {
         file: diagramPath,
         strict: z.boolean().optional(),
-        json: z.boolean().optional()
+        json: z.boolean().optional().describe("Defaults to true for MCP calls.")
       }
     },
-    async ({ file, strict, json }) => runTool("validate.py", toArgs([file, strict ? "--strict" : undefined, json ? "--json" : undefined]))
+    async ({ file, strict, json }) =>
+      runTool("validate.py", toArgs([file, strict ? "--strict" : undefined, (json ?? true) ? "--json" : undefined]))
   );
 
   server.registerTool(
     "btp_drawio_score",
     {
-      description: "Score a .drawio file against the bundled SAP reference corpus.",
+      description: "Score a .drawio file against the bundled SAP reference corpus. Returns JSON by default for MCP clients.",
       inputSchema: {
         file: diagramPath,
         minScore: z.number().optional(),
         minSapLike: z.number().optional(),
         top: z.number().int().positive().optional(),
-        json: z.boolean().optional(),
+        json: z.boolean().optional().describe("Defaults to true for MCP calls unless scoreOnly or sapScoreOnly is set."),
         scoreOnly: z.boolean().optional(),
         sapScoreOnly: z.boolean().optional()
       }
@@ -150,12 +205,24 @@ export async function main() {
           minScore?.toString(),
           minSapLike !== undefined ? "--min-sap-like" : undefined,
           minSapLike?.toString(),
-          json ? "--json" : undefined,
+          (json ?? !(scoreOnly || sapScoreOnly)) ? "--json" : undefined,
           scoreOnly ? "--score" : undefined,
           sapScoreOnly ? "--sap-score" : undefined,
           file
         ])
       )
+  );
+
+  server.registerTool(
+    "btp_drawio_autofix",
+    {
+      description: "Apply deterministic mechanical fixes to a .drawio file, or preview them without writing.",
+      inputSchema: {
+        file: diagramPath,
+        write: z.boolean().optional().describe("Modify the file in place and create a .bak backup.")
+      }
+    },
+    async ({ file, write }) => runTool("autofix.py", toArgs([file, write ? "--write" : undefined]))
   );
 
   server.registerTool(
@@ -191,15 +258,19 @@ export async function main() {
   server.registerTool(
     "btp_drawio_relabel",
     {
-      description: "Apply deterministic label replacements to a scaffolded .drawio file.",
+      description: "Apply deterministic label replacements to a scaffolded .drawio file. Accepts a mapping path or inline JSON.",
       inputSchema: {
         file: diagramPath,
-        mapping: z.string().min(1).describe("JSON label map path"),
+        mapping: z.string().optional().describe("JSON label map path, or an inline JSON object string."),
+        mappingJson: z.string().optional().describe("Inline JSON label map string."),
         out: diagramPath.optional(),
         write: z.boolean().optional()
       }
     },
-    async ({ file, mapping, out, write }) => runTool("relabel.py", toArgs([file, mapping, out ? "--out" : undefined, out, write ? "--write" : undefined]))
+    async ({ file, mapping, mappingJson, out, write }) =>
+      withRelabelMapping({ mapping, mappingJson }, (mappingPath) =>
+        runTool("relabel.py", toArgs([file, mappingPath, out ? "--out" : undefined, out, write ? "--write" : undefined]))
+      )
   );
 
   server.registerTool(
@@ -222,6 +293,49 @@ export async function main() {
         "extract_icon.py",
         toArgs([
           query,
+          id ? "--id" : undefined,
+          id,
+          x !== undefined ? "--x" : undefined,
+          x?.toString(),
+          y !== undefined ? "--y" : undefined,
+          y?.toString(),
+          w !== undefined ? "--w" : undefined,
+          w?.toString(),
+          h !== undefined ? "--h" : undefined,
+          h?.toString(),
+          parent ? "--parent" : undefined,
+          parent,
+          label ? "--label" : undefined,
+          label
+        ])
+      )
+  );
+
+  server.registerTool(
+    "btp_drawio_extract_asset",
+    {
+      description: "Emit a ready-to-paste mxCell for any indexed SAP starter-kit asset, including generic on-premise backend icons.",
+      inputSchema: {
+        query: z.string().min(1).optional(),
+        list: z.boolean().optional(),
+        kind: assetKind,
+        id: z.string().optional(),
+        x: z.number().int().optional(),
+        y: z.number().int().optional(),
+        w: z.number().int().optional(),
+        h: z.number().int().optional(),
+        parent: z.string().optional(),
+        label: z.string().optional()
+      }
+    },
+    async ({ query, list, kind, id, x, y, w, h, parent, label }) =>
+      runTool(
+        "extract_asset.py",
+        toArgs([
+          query,
+          list ? "--list" : undefined,
+          kind ? "--kind" : undefined,
+          kind,
           id ? "--id" : undefined,
           id,
           x !== undefined ? "--x" : undefined,

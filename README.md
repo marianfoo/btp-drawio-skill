@@ -144,7 +144,19 @@ For MCPB packaging, stage and pack a bundle:
 npm run mcpb:pack
 ```
 
-That creates `.cache/mcpb/btp-drawio-skill.mcpb` using `mcpb/manifest.json`. The manifest exposes tools for scaffolding, semantic rendering, validation, scoring, rendering, relabeling, and icon extraction.
+That creates `.cache/mcpb/btp-drawio-skill.mcpb` using `mcpb/manifest.json`. The manifest exposes tools for diagnostics, scaffolding, semantic rendering, validation, scoring, autofix, rendering, relabeling, icon extraction, and generic asset extraction.
+
+MCP clients can call `btp_drawio_relabel` with either a JSON mapping file path or inline JSON:
+
+```json
+{
+  "file": "scaffold.drawio",
+  "mappingJson": "{\"SAP Cloud Connector\":\"SAP Cloud Connector (customer network)\"}",
+  "out": "diagram.drawio"
+}
+```
+
+The MCP server also exposes `btp_drawio_autofix` for deterministic mechanical cleanup and `btp_drawio_extract_asset` for generic SAP starter-kit assets such as `on-premise-sap`. Use `btp_drawio_doctor` first when Python or draw.io rendering is not configured; it reports the resolved package root, Python runtime, and `DRAWIO_CLI` setting.
 
 ### Updating the plugin
 

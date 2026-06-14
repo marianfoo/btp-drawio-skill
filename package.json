@@ -12,7 +12,7 @@
     "bin/",
     "lib/",
     "mcpb/",
-    "scripts/stage-mcpb.mjs",
+    "scripts/*.mjs",
     "plugins/",
     "!plugins/**/.cache/**",
     "!plugins/**/__pycache__/**",
@@ -21,9 +21,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test test/node/*.test.js && python3 -m unittest discover -s tests -v",
+    "test": "node --test test/node/*.test.js && node scripts/run-python-tests.mjs",
     "test:node": "node --test test/node/*.test.js",
-    "test:python": "python3 -m unittest discover -s tests -v",
+    "test:python": "node scripts/run-python-tests.mjs",
     "doctor": "node bin/btp-drawio.js doctor",
     "mcpb:stage": "node scripts/stage-mcpb.mjs",
     "mcpb:pack": "npm run mcpb:stage && npx @anthropic-ai/mcpb pack .cache/mcpb/btp-drawio-skill .cache/mcpb/btp-drawio-skill.mcpb"

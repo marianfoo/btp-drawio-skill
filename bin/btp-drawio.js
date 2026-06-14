@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { checkPython, packageRoot, runPythonInherit, scriptPath } from "../lib/python-tools.js";
+import { checkPython, missingPythonMessage, packageRoot, runPythonInherit, scriptPath } from "../lib/python-tools.js";
 
 const COMMANDS = new Map([
   ["scaffold", "scaffold_diagram.py"],
@@ -68,7 +68,7 @@ function printDoctor() {
     console.log(`python      : ${python.command} (${python.version})`);
   } else {
     ok = false;
-    console.log("python      : missing (set BTP_DRAWIO_PYTHON or install python3)");
+    console.log(`python      : missing (${missingPythonMessage()})`);
   }
 
   for (const script of ["scaffold_diagram.py", "render_semantic.py", "validate.py", "score_corpus.py"]) {

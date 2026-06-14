@@ -31,6 +31,10 @@
   },
   "tools": [
     {
+      "name": "btp_drawio_doctor",
+      "description": "Check local runtime setup for Python, bundled scripts, and draw.io CLI configuration."
+    },
+    {
       "name": "btp_drawio_scaffold",
       "description": "Copy the closest SAP reference template to a destination .drawio file."
     },
@@ -47,16 +51,24 @@
       "description": "Score a .drawio file against the bundled SAP reference corpus."
     },
     {
+      "name": "btp_drawio_autofix",
+      "description": "Apply deterministic mechanical fixes to a .drawio file."
+    },
+    {
       "name": "btp_drawio_render",
       "description": "Export a .drawio file using the draw.io desktop CLI."
     },
     {
       "name": "btp_drawio_relabel",
-      "description": "Apply deterministic label replacements to a scaffolded .drawio file."
+      "description": "Apply deterministic label replacements to a scaffolded .drawio file from a map path or inline JSON."
     },
     {
       "name": "btp_drawio_extract_icon",
       "description": "Emit a ready-to-paste mxCell for a SAP BTP service icon."
+    },
+    {
+      "name": "btp_drawio_extract_asset",
+      "description": "Emit a ready-to-paste mxCell for any indexed SAP starter-kit asset."
     }
   ],
   "compatibility": {
