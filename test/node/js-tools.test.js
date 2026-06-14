@@ -10,7 +10,7 @@ import { pyRound, snap10 } from "../../src/core/round.js";
 import { parseCompareStyle, parseValidateStyle } from "../../src/core/styles.js";
 import { canonicalizeXml, elementsByTag, parseXml } from "../../src/core/xml.js";
 
-const cli = new URL("../../bin/btp-drawio.js", import.meta.url).pathname;
+const cli = fileURLToPath(new URL("../../bin/btp-drawio.js", import.meta.url));
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const referenceDir = join(repoRoot, "plugins", "sap-architecture", "skills", "sap-architecture", "assets", "reference-examples");
 const selectParityPrompts = [
