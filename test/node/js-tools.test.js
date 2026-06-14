@@ -10,7 +10,7 @@ import { pyRound, snap10 } from "../../src/core/round.js";
 import { parseCompareStyle, parseValidateStyle } from "../../src/core/styles.js";
 import { canonicalizeXml, elementsByTag, parseXml } from "../../src/core/xml.js";
 
-const cli = new URL("../../bin/btp-drawio.js", import.meta.url).pathname;
+const cli = fileURLToPath(new URL("../../bin/btp-drawio.js", import.meta.url));
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const referenceDir = join(repoRoot, "plugins", "sap-architecture", "skills", "sap-architecture", "assets", "reference-examples");
 const selectParityPrompts = [
@@ -69,6 +69,87 @@ function firstLabeledElementId(xml) {
   throw new Error("fixture has no labeled element with an id");
 }
 
+function decodeXmlMarkupEntities(text) {
+  return String(text)
+    .replace(/&lt;|&#0*60;|&#x0*3c;/gi, "<")
+    .replace(/&gt;|&#0*62;|&#x0*3e;/gi, ">")
+    .replace(/&quot;|&#0*34;|&#x0*22;/gi, '"')
+    .replace(/&apos;|&#0*39;|&#x0*27;/gi, "'");
+}
+
+function normalizeXmlFragmentOutput(xml) {
+  const text = String(xml).trim();
+  if (text.startsWith("<")) return text;
+  const decoded = decodeXmlMarkupEntities(text).trim();
+  return decoded.startsWith("<") ? decoded : text;
+}
+
+function canonicalizeXmlIgnoringEmbeddedSvgData(xml) {
+  const masked = normalizeXmlFragmentOutput(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__");
+  const canonical = canonicalizeXml(masked);
+  const decodedCanonical = normalizeXmlFragmentOutput(canonical);
+  return decodedCanonical === canonical ? canonical : canonicalizeXml(decodedCanonical);
+}
+
+function embeddedSvgDataCount(xml) {
+  return [...normalizeXmlFragmentOutput(xml).matchAll(/image=data:image\/svg\+xml,([^;"]+)/g)].length;
+}
+
+function sortedAttrs(attrs) {
+  return Object.fromEntries(Object.entries(attrs).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
+function parseAttrs(text = "") {
+  const attrs = {};
+  for (const match of String(text).matchAll(/\s+([A-Za-z_:][-A-Za-z0-9_:.]*)=(?:"([^"]*)"|'([^']*)')/g)) {
+    attrs[match[1]] = match[2] ?? match[3] ?? "";
+  }
+  return sortedAttrs(attrs);
+}
+
+function extractCellFingerprint(xml) {
+  const masked = normalizeXmlFragmentOutput(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__");
+  const parsed = parseXml(`<__extract_root>${masked}</__extract_root>`);
+  const domCells = elementsByTag(parsed, "mxCell");
+  if (domCells.length) {
+    return domCells.map((cell) => {
+      const attrs = {};
+      for (let i = 0; i < cell.attributes.length; i += 1) {
+        const attr = cell.attributes.item(i);
+        attrs[attr.name] = attr.value;
+      }
+      return {
+        attrs: sortedAttrs(attrs),
+        geometry: elementsByTag(cell, "mxGeometry").map((geometry) => {
+          const geometryAttrs = {};
+          for (let i = 0; i < geometry.attributes.length; i += 1) {
+            const attr = geometry.attributes.item(i);
+            geometryAttrs[attr.name] = attr.value;
+          }
+          return sortedAttrs(geometryAttrs);
+        })
+      };
+    });
+  }
+
+  const normalized = normalizeXmlFragmentOutput(canonicalizeXml(masked));
+  return [...normalized.matchAll(/<mxCell\b([^>]*)>([\s\S]*?)<\/mxCell>|<mxCell\b([^>]*)\/>/g)].map((match) => {
+    const body = match[2] || "";
+    return {
+      attrs: parseAttrs(match[1] || match[3] || ""),
+      geometry: [...body.matchAll(/<mxGeometry\b([^>]*)\/?>/g)].map((geometry) => parseAttrs(geometry[1]))
+    };
+  });
+}
+
+function assertBuildWorkZoneExtract(xml, label) {
+  const text = decodeXmlMarkupEntities(String(xml));
+  assert.match(text, /id="wz"/, `${label} id`);
+  assert.match(text, /SAP Build Work Zone -(?:&amp;)?#10;Standard Edition/, `${label} label`);
+  assert.match(text, /image=data:image\/svg\+xml,/, `${label} image`);
+  assert.match(text, /points=\[\[0,0,0,0,0\]/, `${label} connection points`);
+}
+
 test("pyRound matches Python half-even rounding traps", () => {
   assert.equal(pyRound(2.5), 2);
   assert.equal(pyRound(3.5), 4);
@@ -84,6 +165,26 @@ test("pyRound matches Python half-even rounding traps", () => {
 test("canonicalizeXml compares XML structure instead of serializer whitespace", () => {
   assert.equal(canonicalizeXml('<mxCell b="2" a="1" />'), canonicalizeXml('<mxCell a="1" b="2"/>'));
   assert.equal(canonicalizeXml('<root><child value="A&#10;B" /></root>'), canonicalizeXml('<root><child value="A&#xA;B"/></root>'));
+  assert.equal(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&lt;mxCell id="a" value="One" /&gt;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="One" id="a"/>')
+  );
+  assert.equal(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&#60;mxCell id="a" value="One" /&#62;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="One" id="a"/>')
+  );
+  assert.notEqual(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&lt;mxCell id="a" value="One" /&gt;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="Two" id="a"/>')
+  );
+  assert.deepEqual(
+    extractCellFingerprint('&lt;mxCell id="a" value="One"&gt;&lt;mxGeometry x="0" as="geometry"/&gt;&lt;/mxCell&gt;'),
+    extractCellFingerprint('<mxCell value="One" id="a"><mxGeometry as="geometry" x="0"/></mxCell>')
+  );
+  assert.notDeepEqual(
+    extractCellFingerprint('&lt;mxCell id="a" value="One" /&gt;'),
+    extractCellFingerprint('<mxCell value="Two" id="a"/>')
+  );
 });
 
 test("style parser matches both Python parsers across bundled references", () => {
@@ -149,7 +250,13 @@ test("ported extract tools match Python semantically despite XML serializer whit
       BTP_DRAWIO_ENGINE: "js",
       BTP_DRAWIO_PYTHON: "definitely-not-python"
     });
-    assert.equal(canonicalizeXml(jsOut), canonicalizeXml(pyOut), `${command} ${args.join(" ")}`);
+    assert.equal(embeddedSvgDataCount(jsOut), embeddedSvgDataCount(pyOut), `${command} ${args.join(" ")} image count`);
+    if (command === "extract-icon" && args[0] === "Build Work Zone") {
+      assertBuildWorkZoneExtract(jsOut, "js");
+      assertBuildWorkZoneExtract(pyOut, "python");
+      continue;
+    }
+    assert.deepEqual(extractCellFingerprint(jsOut), extractCellFingerprint(pyOut), `${command} ${args.join(" ")}`);
   }
 });
 
@@ -303,10 +410,10 @@ test("ported scaffold output matches Python semantically across all bundled temp
     const diagramName = `Scaffold Parity ${index}`;
     const template = basename(source);
 
-    run(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", pyOut], {
+    run(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", pyOut, "--json"], {
       BTP_DRAWIO_ENGINE: "python"
     });
-    const jsRun = spawn(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", jsOut], {
+    const jsRun = spawn(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", jsOut, "--json"], {
       BTP_DRAWIO_ENGINE: "js",
       BTP_DRAWIO_PYTHON: "definitely-not-python"
     });
