@@ -37,13 +37,27 @@ from pathlib import Path
 THIS_DIR = Path(__file__).resolve().parent
 SCRIPTS_DIR = THIS_DIR
 ASSETS_DIR = THIS_DIR.parent / "assets" / "reference-examples"
+REPO_ROOT = THIS_DIR.parents[4]
+EXTERNAL_REFERENCE_ROOTS = [
+    REPO_ROOT / ".cache" / "external" / "sap-btp-reference-architectures",
+    REPO_ROOT / ".cache" / "external" / "teched2023-XP286v",
+]
 
 sys.path.insert(0, str(SCRIPTS_DIR))
 import select_reference  # type: ignore[import-not-found]
 
 
-def rank_candidates(query: str, top: int) -> list[select_reference.Candidate]:
+def reference_pool(include_external: bool = False) -> list[Path]:
     refs = sorted(ASSETS_DIR.rglob("*.drawio"))
+    if include_external:
+        for root in EXTERNAL_REFERENCE_ROOTS:
+            if root.exists():
+                refs.extend(sorted(root.rglob("*.drawio")))
+    return sorted(dict.fromkeys(refs))
+
+
+def rank_candidates(query: str, top: int, *, include_external: bool = False) -> list[select_reference.Candidate]:
+    refs = reference_pool(include_external)
     return sorted(
         (select_reference.score(p, query) for p in refs),
         key=lambda c: (-c.score, c.path),
@@ -79,6 +93,11 @@ def main() -> int:
     ap.add_argument("--top", type=int, default=5, help="show this many ranked candidates")
     ap.add_argument("--dry-run", action="store_true", help="don't copy; just print top candidates")
     ap.add_argument("--diagram-name", help="rename the <diagram name=...> attribute after copy")
+    ap.add_argument(
+        "--include-external-sap-references",
+        action="store_true",
+        help="also rank cached official SAP reference architectures under .cache/external when present",
+    )
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--force", action="store_true", help="overwrite destination if it exists")
     args = ap.parse_args()
@@ -96,20 +115,22 @@ def main() -> int:
     candidates: list[select_reference.Candidate] = []
 
     if args.template:
+        pool = reference_pool(args.include_external_sap_references)
         candidate_path = (ASSETS_DIR / args.template).resolve()
         if not candidate_path.exists():
             # Fallback: case-insensitive match by stem or filename
             target = args.template.lower()
-            for p in ASSETS_DIR.rglob("*.drawio"):
+            for p in pool:
                 if p.name.lower() == target or p.stem.lower() == target.removesuffix(".drawio"):
                     candidate_path = p
                     break
         if not candidate_path.exists():
-            print(f"--template {args.template!r}: not found in {ASSETS_DIR}", file=sys.stderr)
+            scope = "bundled and cached external references" if args.include_external_sap_references else str(ASSETS_DIR)
+            print(f"--template {args.template!r}: not found in {scope}", file=sys.stderr)
             return 1
         chosen = candidate_path
     else:
-        candidates = rank_candidates(query, args.top)
+        candidates = rank_candidates(query, args.top, include_external=args.include_external_sap_references)
         if not candidates:
             print("no candidates found", file=sys.stderr)
             return 1

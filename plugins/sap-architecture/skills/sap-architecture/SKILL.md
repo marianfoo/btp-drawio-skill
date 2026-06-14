@@ -9,21 +9,24 @@ Take a natural-language description of an SAP / BTP / on-prem landscape and prod
 
 ## STOP — read this before generating any XML
 
-This skill ALWAYS starts from a pristine SAP reference template. The single most common failure mode is the LLM trying to write a `.drawio` file from scratch and ending up with: dark page background, custom flow verbs (PROMPT/ROUTE/CONTEXT/DELEGATE), wrong zone hierarchy (e.g. Joule nested inside BTP instead of beside it), missing SAP footer/logo branding, off-vocabulary connector colors. None of those mistakes are recoverable by autofix — they are baked into the structure.
+This skill normally starts from a pristine SAP reference template. The single most common failure mode is the LLM trying to write a `.drawio` file from scratch and ending up with: dark page background, custom flow verbs (PROMPT/ROUTE/CONTEXT/DELEGATE), wrong zone hierarchy (e.g. Joule nested inside BTP instead of beside it), missing SAP footer/logo branding, off-vocabulary connector colors. None of those mistakes are recoverable by autofix — they are baked into the structure.
 
 The mandatory first action — before any other tool call — is:
 
 ```bash
 python3 .claude/skills/sap-architecture/scripts/scaffold_diagram.py \
   "<the user's full request, verbatim>" \
+  --include-external-sap-references \
   --out <destination.drawio>
 ```
 
-That script ranks the 63 bundled SAP templates against the request, copies the best match to the destination, and prints the alternatives. Now you have a SAP-anchored starting point. From here you make surgical label changes only — never `cat <<EOF > foo.drawio`, never write XML from scratch.
+That script ranks the 71 bundled SAP templates and, when present, cached official SAP reference architectures against the request, copies the best match to the destination, and prints the alternatives. Now you have a SAP-anchored starting point. From here you make surgical label changes only — never `cat <<EOF > foo.drawio`, never write XML from scratch.
 
 If the user asks "use the X template", pass `--template ac_X.drawio` to the scaffold instead. If you genuinely need to inspect candidates first without copying, pass `--dry-run`.
 
-The validate.py / compare.py gates will reject from-scratch generations: dark `pageBackgroundColor` is now an error, novelty pill verbs are warnings, missing zones lower the score against the chosen reference.
+If the scaffolded family is visibly wrong and no SAP reference is close enough, use `render_semantic.py` as a constrained fallback for supported archetypes (`security-operations`, `devops`, `private-connectivity`, `integration-flow`, `ai-agent`). This is still deterministic SAP-style XML, not freehand XML.
+
+The validate.py / compare.py gates will reject weak generations: dark `pageBackgroundColor` is now an error, novelty pill verbs are warnings, missing zones lower the score against the chosen reference, and all bundled references must score 100 against themselves.
 
 ## When to use
 
@@ -61,12 +64,13 @@ This step is non-negotiable. Run scaffold_diagram.py — it both ranks templates
 ```bash
 python3 .claude/skills/sap-architecture/scripts/scaffold_diagram.py \
   "<the user's full diagram request>" \
+  --include-external-sap-references \
   --out <destination.drawio>
 ```
 
-If you only want to inspect candidates first, add `--dry-run` (no file is created). To pin a specific template, use `--template <filename>`. To rename the `<diagram name>` attribute after copy, pass `--diagram-name "Agentic AI on BTP"`.
+If you only want to inspect candidates first, add `--dry-run` (no file is created). To pin a specific template, use `--template <filename>`. To rename the `<diagram name>` attribute after copy, pass `--diagram-name "Agentic AI on BTP"`. The external-reference flag is safe when no external corpus is cached; it silently uses only bundled templates.
 
-**63 reference templates** are bundled, all Apache-2.0, sourced verbatim from `SAP/btp-solution-diagrams` (prefix `btp_`) and `SAP/architecture-center` (prefix `ac_`). Reference families: Task Center, Build Work Zone, Build Process Automation, Cloud Identity Services / IAM, Private Link, Event-Driven Architecture, E2B connectivity, multi-region resiliency, Federated ML, hyperscaler data integration, Generative AI / RAG, A2A / MCP, Edge Integration Cell, Business Data Cloud, OData via App Router / CAP, B2B / A2A / API-managed integration, DevOps, Joule, SIEM/SOAR, SuccessFactors integration, and Agentic AI.
+**71 reference templates** are bundled, all Apache-2.0, sourced verbatim from `SAP/btp-solution-diagrams` (prefix `btp_`), `SAP/architecture-center` (prefix `ac_`), and curated external SAP reference examples (prefix `ext_`). Reference families: Task Center, Build Work Zone, Build Process Automation, Cloud Identity Services / IAM, Private Link, Event-Driven Architecture, E2B connectivity, multi-region resiliency, Federated ML, hyperscaler data integration, Generative AI / RAG, A2A / MCP, Edge Integration Cell, Business Data Cloud, OData via App Router / CAP, B2B / A2A / API-managed integration, DevOps, Joule, SIEM/SOAR, SuccessFactors integration, and Agentic AI.
 
 The selector reads `assets/reference-examples/template-metadata.json`, which gives every bundled template a curated title, domain, level, aliases, and scenario tags. Templates marked `"primary": true` win for canonical family prompts (e.g. `ac_RA0029_AgenticAI_root.drawio` for "Agentic AI on SAP BTP"). Trust those rankings over raw visible labels such as `Page-1`.
 
@@ -87,6 +91,25 @@ After scaffold has copied a template, **preserve all of it** — title band, zon
 For Architecture Center templates such as `ac_RA0029_AgenticAI_root.drawio`, do **not** replace the white canvas, footer, network divider, or SAP-branded area structure with a dark dashboard layout. If the user asks for a "legend" but the chosen template has no separate bottom legend, satisfy that by preserving the existing inline pills/labels and printing the flow narration after the diagram.
 
 **Do not draw from scratch.** Starting from a pristine template is the single highest-fidelity trick in this skill. Building a `.drawio` directly with Write/Edit (without scaffold_diagram.py first) is the most common cause of validator errors, dark backgrounds, novelty pill verbs, and bent edges.
+
+### 2b. Semantic fallback for ceiling-limited templates
+
+Use this only when scaffold candidates are the wrong architecture family or the user asks for a new composition that cannot be expressed by relabeling one template. The renderer supports a small set of BTP archetypes and produces grid-snapped SAP-style XML with anchored orthogonal edges:
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/render_semantic.py \
+  "<the user's full diagram request>" \
+  --out <destination.drawio>
+```
+
+Override the archetype only when the automatic choice is wrong:
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/render_semantic.py \
+  "<request>" --archetype security-operations --out <destination.drawio>
+```
+
+Supported archetypes: `security-operations`, `devops`, `private-connectivity`, `integration-flow`, `ai-agent`. After semantic rendering, run the same autofix / validate / render-review loop. If a proper SAP template exists, prefer the template; semantic fallback is for escaping a bad nearest-template geometry ceiling.
 
 ### 3. Place BTP service icons from the bundled library
 
@@ -330,9 +353,10 @@ sap-architecture/
 │   │   ├── sap-generic-icons-size-M-200302.xml
 │   │   ├── connectors.xml / area_shapes.xml / default_shapes.xml
 │   │   └── essentials.xml / numbers.xml / sap_brand_names.xml / text_elements.xml / annotations_and_interfaces.xml
-│   ├── reference-examples/        — 63 pristine SAP ref-arch templates (Apache-2.0)
+│   ├── reference-examples/        — 71 pristine SAP ref-arch templates (Apache-2.0)
 │   │                                 11 from SAP/btp-solution-diagrams (prefix btp_)
 │   │                                 52 from SAP/architecture-center (prefix ac_)
+│   │                                 8 curated external SAP references (prefix ext_)
 │   │   └── template-metadata.json  — curated scenario titles, aliases, tags, domains, levels
 │   ├── icon-index.json            — slug → library label + ready-to-paste mxCell style
 │   ├── asset-index.json           — 448 SAP draw.io assets across 10 libraries
@@ -344,8 +368,9 @@ sap-architecture/
     ├── extract_asset.py           — fuzzy any SAP starter-kit asset → mxCell snippet
     ├── check_asset_coverage.py    — smoke-check library/index/palette coverage
     ├── scaffold_diagram.py        — copy the closest SAP template to a destination (FIRST STEP)
+    ├── render_semantic.py         — deterministic SAP-style fallback for ceiling-limited archetypes
     ├── select_reference.py        — request text → ranked SAP template candidates
-    ├── template_browser.py        — pre-render the 63 templates into a thumbnail gallery
+    ├── template_browser.py        — pre-render the templates into a thumbnail gallery
     ├── render.py                  — drawio CLI wrapper (export to PNG/SVG/PDF)
     ├── render_compare.py          — render candidate + reference, build side-by-side HTML review
     ├── iterate.py                 — Nudge-mode loop: render+score+structured next-steps for the LLM

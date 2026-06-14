@@ -399,8 +399,11 @@ def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
         if ref.pills == 0:
             parts["pill_vocab"] = 1.0 if cand_canon_rate >= 0.6 else cand_canon_rate
         else:
-            # Match the reference's canon rate within tolerance, full credit if cand >= ref
-            target = max(ref_canon_rate, 0.5)
+            # Match the reference's own canon rate. Some official SAP diagrams
+            # intentionally use scenario-specific flow labels such as
+            # "Security Logs" or "Open Ticket"; comparing a reference with
+            # itself must still score 100.
+            target = ref_canon_rate
             parts["pill_vocab"] = 1.0 if cand_canon_rate >= target else (cand_canon_rate / max(0.01, target))
         if cand.novelty_pill_count > 0 and cand.novelty_pill_count > ref.novelty_pill_count:
             r.diffs.append(
