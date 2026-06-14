@@ -8,6 +8,9 @@ __pycache__/
 .venv/
 venv/
 
+# Node
+node_modules/
+
 # draw.io autofix backups
 *.drawio.bak
 

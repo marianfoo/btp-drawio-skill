@@ -17,6 +17,7 @@ Bundles:
 
 - [Quick start — Claude Code users](#quick-start--claude-code-users)
 - [Prompting for good diagrams](#prompting-for-good-diagrams)
+- [Use with npx, MCP, and MCPB](#use-with-npx-mcp-and-mcpb)
 - [Install in Claude Desktop / Claude.ai](#install-in-claude-desktop--claudeai)
 - [Use outside of Claude (other Agent-Skills runtimes)](#use-outside-of-claude-other-agent-skills-runtimes)
 - [Use the scripts directly (no LLM)](#use-the-scripts-directly-no-llm)
@@ -90,6 +91,60 @@ Strong prompt:
 Weak prompt:
 
 > Draw ARC-1 with BTP and S/4HANA.
+
+## Use with npx, MCP, and MCPB
+
+This repo now ships a Node entry point for easier local use and packaging. The Node layer wraps the stable Python diagram engine, so **Python 3.8+ is still required** for the current implementation.
+
+From npm once published:
+
+```bash
+npx btp-drawio-skill doctor
+npx btp-drawio-skill semantic \
+  "Developer uses ARC-1 on SAP BTP Cloud Foundry to call on-premise SAP S/4HANA through Cloud Connector" \
+  --out arc1-onprem.drawio
+npx btp-drawio-skill validate arc1-onprem.drawio
+npx btp-drawio-skill score --min-sap-like 90 arc1-onprem.drawio
+```
+
+From this checkout:
+
+```bash
+npm install
+node bin/btp-drawio.js doctor
+node bin/btp-drawio.js scaffold "<request>" --out scaffold.drawio
+node bin/btp-drawio.js semantic "<request>" --out semantic.drawio
+```
+
+MCP stdio server:
+
+```bash
+npx btp-drawio-skill mcp
+```
+
+For a local Claude/Cursor-style MCP config before npm publish, point directly at the checkout:
+
+```json
+{
+  "mcpServers": {
+    "btp-drawio": {
+      "command": "node",
+      "args": ["/absolute/path/to/btp-drawio-skill/bin/btp-drawio-mcp.js"],
+      "env": {
+        "BTP_DRAWIO_PYTHON": "python3"
+      }
+    }
+  }
+}
+```
+
+For MCPB packaging, stage and pack a bundle:
+
+```bash
+npm run mcpb:pack
+```
+
+That creates `.cache/mcpb/btp-drawio-skill.mcpb` using `mcpb/manifest.json`. The manifest exposes tools for scaffolding, semantic rendering, validation, scoring, rendering, relabeling, and icon extraction.
 
 ### Updating the plugin
 

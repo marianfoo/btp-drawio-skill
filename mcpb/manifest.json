@@ -1,0 +1,85 @@
+{
+  "manifest_version": "0.3",
+  "name": "btp-drawio-skill",
+  "display_name": "BTP Draw.io Skill",
+  "version": "0.1.0",
+  "description": "Generate, validate, score, and render SAP BTP Architecture Center-style draw.io diagrams.",
+  "long_description": "Local MCP server and CLI wrapper for the BTP draw.io skill. It exposes SAP template scaffolding, deterministic semantic rendering, validation, scoring, rendering, relabeling, and icon extraction tools backed by the bundled SAP Architecture Center-style templates and assets.",
+  "author": {
+    "name": "marianfoo",
+    "url": "https://github.com/marianfoo"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marianfoo/btp-drawio-skill.git"
+  },
+  "documentation": "https://github.com/marianfoo/btp-drawio-skill#readme",
+  "support": "https://github.com/marianfoo/btp-drawio-skill/issues",
+  "license": "Apache-2.0",
+  "keywords": ["sap", "btp", "drawio", "architecture", "diagrams"],
+  "server": {
+    "type": "node",
+    "entry_point": "bin/btp-drawio-mcp.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/bin/btp-drawio-mcp.js"],
+      "env": {
+        "BTP_DRAWIO_PYTHON": "${user_config.python_command}",
+        "DRAWIO_CLI": "${user_config.drawio_cli}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "btp_drawio_scaffold",
+      "description": "Copy the closest SAP reference template to a destination .drawio file."
+    },
+    {
+      "name": "btp_drawio_render_semantic",
+      "description": "Render a deterministic SAP-style semantic fallback diagram."
+    },
+    {
+      "name": "btp_drawio_validate",
+      "description": "Validate a .drawio file for SAP style and structural issues."
+    },
+    {
+      "name": "btp_drawio_score",
+      "description": "Score a .drawio file against the bundled SAP reference corpus."
+    },
+    {
+      "name": "btp_drawio_render",
+      "description": "Export a .drawio file using the draw.io desktop CLI."
+    },
+    {
+      "name": "btp_drawio_relabel",
+      "description": "Apply deterministic label replacements to a scaffolded .drawio file."
+    },
+    {
+      "name": "btp_drawio_extract_icon",
+      "description": "Emit a ready-to-paste mxCell for a SAP BTP service icon."
+    }
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=20.0.0",
+      "python": ">=3.8"
+    }
+  },
+  "user_config": {
+    "python_command": {
+      "type": "string",
+      "title": "Python command",
+      "description": "Python executable used to run the bundled skill scripts.",
+      "required": false,
+      "default": "python3"
+    },
+    "drawio_cli": {
+      "type": "string",
+      "title": "draw.io CLI path",
+      "description": "Optional path to draw.io desktop CLI for PNG/SVG/PDF export.",
+      "required": false,
+      "default": ""
+    }
+  }
+}

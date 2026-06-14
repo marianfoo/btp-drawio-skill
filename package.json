@@ -1,0 +1,52 @@
+{
+  "name": "btp-drawio-skill",
+  "version": "0.1.0",
+  "description": "Generate, validate, score, and render SAP BTP Architecture Center-style draw.io diagrams.",
+  "type": "module",
+  "bin": {
+    "btp-drawio-skill": "bin/btp-drawio.js",
+    "btp-drawio": "bin/btp-drawio.js",
+    "btp-drawio-mcp": "bin/btp-drawio-mcp.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "mcpb/",
+    "scripts/stage-mcpb.mjs",
+    "plugins/",
+    "!plugins/**/.cache/**",
+    "!plugins/**/__pycache__/**",
+    "!plugins/**/*.pyc",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/node/*.test.js && python3 -m unittest discover -s tests -v",
+    "test:node": "node --test test/node/*.test.js",
+    "test:python": "python3 -m unittest discover -s tests -v",
+    "doctor": "node bin/btp-drawio.js doctor",
+    "mcpb:stage": "node scripts/stage-mcpb.mjs",
+    "mcpb:pack": "npm run mcpb:stage && npx @anthropic-ai/mcpb pack .cache/mcpb/btp-drawio-skill .cache/mcpb/btp-drawio-skill.mcpb"
+  },
+  "keywords": [
+    "sap",
+    "btp",
+    "drawio",
+    "diagrams",
+    "mcp",
+    "mcpb"
+  ],
+  "author": "marianfoo",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marianfoo/btp-drawio-skill.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  }
+}
