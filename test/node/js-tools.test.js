@@ -72,7 +72,9 @@ function firstLabeledElementId(xml) {
 
 function normalizeXmlFragmentOutput(xml) {
   const text = String(xml).trim();
-  return text.startsWith("&lt;") ? decodeHTML(text) : text;
+  if (text.startsWith("<")) return text;
+  const decoded = decodeHTML(text).trim();
+  return decoded.startsWith("<") ? decoded : text;
 }
 
 function canonicalizeXmlIgnoringEmbeddedSvgData(xml) {
@@ -100,6 +102,10 @@ test("canonicalizeXml compares XML structure instead of serializer whitespace", 
   assert.equal(canonicalizeXml('<root><child value="A&#10;B" /></root>'), canonicalizeXml('<root><child value="A&#xA;B"/></root>'));
   assert.equal(
     canonicalizeXmlIgnoringEmbeddedSvgData('&lt;mxCell id="a" value="One" /&gt;'),
+    canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="One" id="a"/>')
+  );
+  assert.equal(
+    canonicalizeXmlIgnoringEmbeddedSvgData('&#60;mxCell id="a" value="One" /&#62;'),
     canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="One" id="a"/>')
   );
   assert.notEqual(
