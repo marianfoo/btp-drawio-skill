@@ -49,7 +49,7 @@ description ┐
 ┌──────────────────────────────────────────────────────────┐
 │ Step 1 — scaffold from a SAP reference template          │
 │   scaffold_diagram.py "<request>" --out <file>.drawio    │
-│   Ranks 63 bundled SAP templates and copies the best one │
+│   Ranks 71 bundled SAP templates and copies the best one │
 │   (uses metadata aliases/tags + visible draw.io labels   │
 │   + the "primary": true flag for canonical umbrella refs)│
 └──────────────────────────────────────────────────────────┘
@@ -114,7 +114,7 @@ The bundled `examples/iam-arc1-mcp-l2.drawio` was produced by:
 3. Running `autofix.py --write` (resulted in 436 mechanical fixes — geometry snap, hex case, arc size, font normalisation, comment strip).
 4. Running `validate.py` — exit 0.
 5. Running `compare.py` against the original reference — **scored 96.6/100** with the target-aware label-token scorer.
-6. Running `score_corpus.py --min-score 90` across the 63 bundled templates — best score **96.6/100**.
+6. Running `score_corpus.py --min-score 90` across the bundled templates — best score **96.6/100**.
 
 This proves the workflow: with a few hand-edits, you preserve SAP's visual structure while the scorer still notices intentional scenario-label changes.
 
@@ -170,7 +170,7 @@ python3 scripts/score_corpus.py \
   my-diagram.drawio
 ```
 
-See `corpus-findings.md` for the 2026 snapshot that motivated the 63-template bundle.
+See `corpus-findings.md` for the 2026 snapshot that motivated the current 71-template bundle.
 
 ## How to add new reference templates
 

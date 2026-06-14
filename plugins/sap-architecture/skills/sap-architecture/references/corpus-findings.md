@@ -17,7 +17,7 @@ The current public corpus contains 138 editable `.drawio` diagrams:
 | `SAP/btp-solution-diagrams/assets/editable-diagram-examples` | 11 | canonical BTP Solution Diagram examples |
 | `SAP/architecture-center/docs/ref-arch/**/drawio` | 127 | Architecture Center reference architecture diagrams |
 
-The raw upstream draw.io corpus is about 24 MB. This plugin bundles a curated 63-template subset: all 11 canonical BTP examples plus 52 Architecture Center templates chosen for broad SAP BTP coverage.
+The raw upstream draw.io corpus is about 24 MB. This plugin bundles a curated 71-template subset: all 11 canonical BTP examples, 52 Architecture Center templates chosen for broad SAP BTP coverage, and 8 curated external SAP-compatible reference examples.
 
 ## What the Live Corpus Shows
 

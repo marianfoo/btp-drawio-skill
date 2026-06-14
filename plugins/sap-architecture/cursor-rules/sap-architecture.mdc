@@ -32,7 +32,11 @@ Then run, in this exact order:
 
 2. **READ THE PRINTED `📐 SAP design recipe` BLOCK.** scaffold_diagram.py prints a precomputed structural summary of the chosen SAP template right after copying: how many top-level zones with what colors, icon sizes, pill vocabulary, edge anchor proportions, detected layout patterns. **This is what makes it look like SAP.** Your job in step 4 is to keep these numbers and patterns intact while changing only labels and a few services.
 
-3. **Surgical relabel.** Open the destination file with the Read tool, find labels that need swapping for the user's scenario (titles, service-card values, zone names), and use Edit to change ONLY those strings. Do NOT rewrite the file. Do NOT touch canvas size, zone hierarchy, network divider, SAP logos, footer, or identity-flow placement. If the recipe says 5 top zones / 14 icons / 13 pills / 46 edges, your edit count for those should be ~0 — only labels move.
+3. **Surgical relabel.** For multiple label swaps, create a small JSON map and run:
+   ```bash
+   python3 $SKILL/relabel.py <destination>.drawio labels.json --out <candidate>.drawio
+   ```
+   Then open the destination/candidate file with the Read tool, find any labels that still need swapping (titles, service-card values, zone names), and use Edit to change ONLY those strings. Do NOT rewrite the file. Do NOT touch canvas size, zone hierarchy, network divider, SAP logos, footer, or identity-flow placement. If the recipe says 5 top zones / 14 icons / 13 pills / 46 edges, your edit count for those should be ~0 — only labels move.
 
 4. **If you need a feature the chosen template doesn't have, search the SAP corpus first** instead of inventing one:
    ```bash

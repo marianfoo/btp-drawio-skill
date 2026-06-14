@@ -1,6 +1,6 @@
 # External SAP diagram test corpus
 
-The bundled 63 templates remain the default because they are curated, compact, and versioned with this plugin. For deeper quality work, use external SAP repositories as opt-in test corpora under `.cache/`.
+The bundled 71 templates remain the default because they are curated, compact, and versioned with this plugin. For deeper quality work, use external SAP repositories as opt-in test corpora under `.cache/`.
 
 ## Recommended external corpus
 

@@ -1,12 +1,13 @@
 # The realistic SAP-diagram workflow
 
 This skill is an **authoring assistant**, not a one-shot generator. After
-weeks of iteration on the LLM-only loop, the leave-one-out evaluation
-plateaus at ~22/63 passes (target score ≥ 90). 28 of the remaining 41
-failures are *ceiling-limited*: the closest available SAP template is
-geometrically too different from the target, and no amount of label
-edits can close the gap. 13 are *near-miss* and improve modestly with
-retries.
+weeks of iteration on the LLM-only loop, historical leave-one-out
+evaluation on an earlier 63-template bundle plateaued quickly. Most
+remaining failures were *ceiling-limited*: the closest available SAP
+template was geometrically too different from the target, and no amount
+of label edits could close the gap. The current 71-template bundle
+improves coverage, but the core lesson remains: use the closest SAP
+template and edit it deliberately.
 
 The honest conclusion: **producing a polished, SAP-Architecture-Center-
 quality diagram requires manual editing for ~⅔ of scenarios.** That is
@@ -18,7 +19,7 @@ possible.
 
 | Stage | What's automatable | What requires human judgment |
 |---|---|---|
-| Template selection | yes — `select_reference.py` ranks 63 templates by metadata + visible labels | yes when the prompt is ambiguous or the right template isn't bundled |
+| Template selection | yes — `select_reference.py` ranks 71 templates by metadata + visible labels | yes when the prompt is ambiguous or the right template isn't bundled |
 | Label rewrites | yes — Ollama's safe label edits | semantic correctness ("does this XSUAA actually call that destination?") |
 | Adding/removing services | partially — `extract_icon.py` drops the right icon at coordinates | layout decisions: which zone, where in the zone, what neighbours |
 | Connector geometry | partially — autofix snaps to grid | alignment to anchor points, edge routing around other shapes |
@@ -60,7 +61,7 @@ python3 scripts/scaffold_diagram.py \
   --out docs/architecture/my-diagram.drawio
 ```
 
-The script ranks the 63 bundled SAP templates against the request,
+The script ranks the 71 bundled SAP templates against the request,
 copies the best match to the destination, and prints the alternates.
 Use `--template <filename>` to pin a specific template, `--dry-run` to
 inspect candidates without copying, `--diagram-name "<title>"` to rename
@@ -73,7 +74,7 @@ python3 scripts/template_browser.py
 open .cache/template-browser/index.html
 ```
 
-Pre-renders all 63 templates into a clickable thumbnail grid with
+Pre-renders all 71 templates into a clickable thumbnail grid with
 filter, domain badges, and the `scaffold_diagram.py --template` command
 for each. Useful when the selector is unsure or the prompt is vague.
 
@@ -149,8 +150,7 @@ required:
 | OData via App Router + Private Link | `ac_RA0014_OData_AppRouter_PrivateLink.drawio` | Specific RA, narrow scenario |
 | SAP IAS authentication L2 | `btp_SAP_Cloud_Identity_Services_Authentication_L2.drawio` | Direct match |
 
-For these, scaffold + run the validators is enough. ~22/63 of leave-one-out
-evals already pass at this level. Run
+For these, scaffold + run the validators is usually enough. Run
 
 ```bash
 python3 scripts/eval_corpus.py inventory --references assets/reference-examples
@@ -165,9 +165,9 @@ to see the full bundled list.
   RA0029 Embodied AI Agents. Expect 15-30 min of manual editing per
   diagram unless you're willing to bundle additional templates from
   upstream SAP repos.
-- **near-miss scenarios** — Codex's eval marks 13 cases as near-miss
-  (88-89 score). Often a 5-minute label tweak in draw.io desktop pushes
-  these above 90.
+- **near-miss scenarios** — eval runs may mark cases as near-miss
+  (typically high-80s score). Often a 5-minute label tweak in draw.io
+  desktop pushes these above 90.
 - **prompts the selector can't resolve** — when the prompt mentions
   multiple equally-relevant scenarios (e.g. "Joule with Federated ML
   via Cloud Connector"), the human picks the right template by browsing
@@ -175,13 +175,13 @@ to see the full bundled list.
 
 ## How to expand template coverage (one-time effort)
 
-The single highest-leverage way to break the 22/63 plateau is to
-**bundle more SAP templates that fill the ceiling-limited families**.
+The single highest-leverage way to improve the hardest cases is to
+**bundle more SAP templates that fill ceiling-limited families**.
 
 Two upstream sources, both Apache-2.0:
 
 1. <https://github.com/SAP/sap-btp-reference-architectures> — 32
-   editable .drawio files; many cover scenarios our 63 templates miss
+   editable .drawio files; many cover scenarios the bundled templates miss
    (specifically: industry-specific integrations, advanced data flows).
 2. <https://github.com/SAP/architecture-center> — already curated; we
    have 52 of these. The remainder are mostly variants of bundled ones.

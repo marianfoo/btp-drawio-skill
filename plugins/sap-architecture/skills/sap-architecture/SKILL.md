@@ -55,6 +55,8 @@ Before touching XML, write out (in your head or as a hidden scratch pad):
 4. **Flow** — number the steps 1..N. Pick a pill color per step from the semantic palette (auth=green, trust=magenta, MCP=teal, authz=indigo). Use only canonical pill verbs: TRUST, Authenticate, Authorization, A2A, MCP, ORD, HTTPS, OData/REST, SAML2/OIDC, Identity Lifecycle, etc.
 5. **Accent / focus app** — the "star" of the diagram (ARC-1, Joule, user's own app). Uses the purple accent.
 
+Good user context includes: target audience/level, actors and entry points, SAP BTP services, SAP cloud/on-prem/third-party systems, identity and trust mechanism, numbered flow/protocols, required zones, and explicit exclusions. If the user pasted a long architecture note, reduce it to one diagram scope before selecting a template. Do not try to draw every component mentioned in a long document.
+
 Keep this plan short — a 10-line bullet list is plenty. Don't skip it: diagrams built without a plan drift off-grid and end up with bent arrows. The plan is what you feed into `scaffold_diagram.py` in step 2.
 
 ### 2. Scaffold from a SAP reference template — MANDATORY
@@ -431,6 +433,6 @@ sap-architecture/
 
 If the user says "make me a BTP deployment diagram" with nothing else, ask ONE clarifying question:
 
-> What's the subject app or flow? e.g. "CAP app with XSUAA + HANA Cloud reading from on-prem ECC".
+> What's the subject app or flow, including the main BTP services, backend systems, and protocol? e.g. "CAP app with XSUAA + HANA Cloud reading from on-prem ECC over OData via Cloud Connector".
 
 Then proceed. Don't ask more than one question — producing a reasonable default and letting the user iterate beats a long back-and-forth.

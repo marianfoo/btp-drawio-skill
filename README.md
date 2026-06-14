@@ -16,6 +16,7 @@ Bundles:
 ## Table of contents
 
 - [Quick start — Claude Code users](#quick-start--claude-code-users)
+- [Prompting for good diagrams](#prompting-for-good-diagrams)
 - [Install in Claude Desktop / Claude.ai](#install-in-claude-desktop--claudeai)
 - [Use outside of Claude (other Agent-Skills runtimes)](#use-outside-of-claude-other-agent-skills-runtimes)
 - [Use the scripts directly (no LLM)](#use-the-scripts-directly-no-llm)
@@ -50,6 +51,45 @@ Claude will auto-load the skill (its trigger phrases are tuned for SAP / BTP / a
 - "Show how a user on VS Code Copilot reaches SAP BW/4HANA through Cloud Connector with Principal Propagation."
 - "Make an L1 conceptual diagram of a Joule integration with Task Center pulling from S/4, SuccessFactors, and Ariba."
 - "Generate an L2 ref-arch for SAP Build Apps fronting a CAP service bound to SAP Event Mesh."
+
+## Prompting for good diagrams
+
+The skill works best when the prompt describes an architecture, not just a product list. Give the agent enough context to choose the right SAP reference template and preserve its structure.
+
+Use this shape for high-quality prompts:
+
+```text
+Create an L2 SAP Architecture Center-style draw.io diagram for <scenario>.
+
+Audience and level: <business overview | solution architecture | implementation flow>.
+Main zones: <User/Client>, <SAP BTP subaccount/runtime>, <SAP Cloud Solutions>, <On-Premise>, <Third-party/Hyperscaler>, <Network divider if relevant>.
+Actors and entry points: <who starts the flow and from where>.
+SAP BTP services: <exact service names>.
+Backends/systems: <SAP S/4HANA, ECC, BW/4HANA, SuccessFactors, Datasphere, Databricks, etc.>.
+Identity/security: <IAS, XSUAA, OAuth, SAML, Principal Propagation, trust, authorization>.
+Flow steps: 1. <protocol/action>, 2. <protocol/action>, 3. <protocol/action>.
+Constraints: <must show Cloud Connector | use Joule as separate zone | prefer template RA0029 | avoid implementation internals>.
+Output: editable .drawio plus numbered flow narration below the diagram.
+```
+
+Helpful context to attach or paste:
+
+- Existing architecture notes, but trimmed to the services, actors, systems, and flows that should appear.
+- A numbered flow, even if rough. Protocol words such as `HTTPS`, `OData/REST`, `OAuth`, `SAML`, `A2A`, `MCP`, `ORD`, and `Principal Propagation` help the skill pick canonical pills and edge colors.
+- The intended abstraction level: `L0` for business overview, `L1` for solution components, `L2` for default technical flow. Avoid mixing all three in one diagram.
+- The deployment boundary: which systems are inside SAP BTP, which are SAP cloud apps, which are on-premise, and which are third party or hyperscaler.
+- Any preferred SAP reference/template name if you know it, for example `ac_RA0029_AgenticAI_root.drawio` for Agentic AI with Joule.
+- A short list of exclusions, such as "do not show CI/CD" or "do not include database internals".
+
+Avoid prompts like "make a BTP diagram for our app" unless you want the agent to ask a clarifying question. Also avoid dumping long unfiltered design docs: they usually contain several diagrams' worth of scope. If you paste a long document, add a short "diagram scope" paragraph that says exactly which flow to draw.
+
+Strong prompt:
+
+> Create an L2 SAP Architecture Center-style draw.io diagram. A developer in VS Code uses ARC-1 running on SAP BTP Cloud Foundry. ARC-1 authenticates with XSUAA, reads a Destination, uses SAP Connectivity service and SAP Cloud Connector, and calls on-premise SAP S/4HANA via OData/REST with Principal Propagation. Show zones for Developer Workstation, SAP BTP Cloud Foundry, and Customer On-Premise Network. Output editable `.drawio` and a numbered flow narration.
+
+Weak prompt:
+
+> Draw ARC-1 with BTP and S/4HANA.
 
 ### Updating the plugin
 

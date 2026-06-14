@@ -72,12 +72,26 @@ The `description` field in `SKILL.md` is front-loaded with SAP-diagram trigger k
 
 For generic diagrams (flowcharts, ER, class) **without** an SAP angle, Claude falls through to whatever general drawio skill you have installed. No conflict.
 
+## What to include in a good prompt
+
+Give the skill enough architectural context to choose a SAP reference template:
+
+- diagram level and audience: `L0`, `L1`, or `L2` (default)
+- main zones: user/client, SAP BTP, SAP cloud applications, on-premise, third-party/hyperscaler, network divider
+- exact SAP BTP services and runtime: Cloud Foundry, Kyma, CAP, XSUAA, Destination, Connectivity, Event Mesh, Integration Suite, HANA Cloud, etc.
+- backend systems: SAP S/4HANA, ECC, BW/4HANA, SuccessFactors, Datasphere, Databricks, and whether they are cloud or on-premise
+- identity/trust: IAS, XSUAA, OAuth, SAML, Principal Propagation, trust, authorization
+- numbered flow steps with protocols or intents: `HTTPS`, `OData/REST`, `A2A`, `MCP`, `ORD`, `SQL`, `Data Federation`
+- constraints: template to prefer, zones that must be separate, what not to include
+
+If you paste a long design document, add a short scope sentence that says which one flow should become the diagram. Otherwise the agent may mix levels or include unrelated components.
+
 ## Workflow (what happens when triggered)
 
 1. **Parse → plan** — infer level / zones / services / numbered flow / accent app from the description.
 2. **Scaffold from a SAP reference template — mandatory** — run `scripts/scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks bundled SAP templates against the request, copies the best match, and prints alternates. Never write XML from scratch.
 3. **Place library assets** — call `scripts/extract_icon.py` for each BTP service and `scripts/extract_asset.py` for generic icons, connector presets, number bubbles, interface pills, and other SAP starter-kit assets.
-4. **Surgically relabel** — change labels in-place; preserve canvas size, zone hierarchy, network divider, SAP logos, footer, identity flow.
+4. **Surgically relabel** — use `relabel.py` for bulk id/visible-label changes where possible, then change only the remaining labels in-place; preserve canvas size, zone hierarchy, network divider, SAP logos, footer, identity flow.
 5. **Validate + autofix + score — mandatory** — `autofix.py --write`, `validate.py` (now catches dark `pageBackgroundColor`, off-vocabulary pill verbs like `PROMPT/ROUTE/CONTEXT/DELEGATE`, and duplicate SAP-logo over-use), then `score_corpus.py --min-score 90` for template-derived diagrams or `score_corpus.py --min-sap-like 90` for semantic fallback diagrams. Evaluation runs also score against the specific target reference; the skill will not hand back a diagram until the validator exits clean and the relevant quality score is high.
 6. **Narrate** — print a numbered markdown list explaining each pill / flow step, for pasting below the embedded image in Confluence / Markdown.
 
@@ -91,6 +105,7 @@ All scripts use only the Python standard library — zero pip install required.
 |---|---|
 | `extract_icon.py "<name>"` | Fuzzy-lookup a BTP service icon; emit ready-to-paste `<mxCell>` with grid-snapped geometry. Supports abbreviations (XSUAA, CPI, HANA, CC, IAS, IPS, CAP, CF). `--list` shows all 100. |
 | `extract_asset.py "<name>" --kind <kind>` | Fuzzy-lookup any indexed SAP starter-kit asset: generic icons, connectors, area/default shapes, essentials, number markers, brand names, text elements, annotations/interfaces, and BTP service icons. |
+| `relabel.py <file> <labels.json> --out <file>` | Deterministically replace labels by cell id or visible label while preserving simple rich-text wrappers. Use before hand-editing XML. |
 | `scaffold_diagram.py "<request>" --out <file>` | Copy the closest SAP reference template to a destination so editing starts from a pristine SAP-style file. Supports `--template` for an explicit pick, `--dry-run` to inspect candidates, and `--diagram-name` to rename the page. **The mandatory first step of the skill.** |
 | `render_semantic.py "<request>" --out <file>` | Deterministic SAP-style fallback renderer for ceiling-limited prompts. Supports `security-operations`, `devops`, `on-prem-connectivity`, `private-connectivity`, `btp-application`, `data-integration`, `integration-flow`, and `ai-agent`. |
 | `render.py <file>.drawio` | Render a `.drawio` file to PNG/SVG/PDF via the draw.io desktop CLI. Auto-discovers the binary on macOS, Linux, WSL2; honor `$DRAWIO_CLI` to override. `--batch <dir>` renders every diagram in a folder. |
