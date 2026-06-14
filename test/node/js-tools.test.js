@@ -13,6 +13,26 @@ import { canonicalizeXml, elementsByTag, parseXml } from "../../src/core/xml.js"
 const cli = new URL("../../bin/btp-drawio.js", import.meta.url).pathname;
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const referenceDir = join(repoRoot, "plugins", "sap-architecture", "skills", "sap-architecture", "assets", "reference-examples");
+const selectParityPrompts = [
+  "Developer uses ARC-1 on SAP BTP Cloud Foundry to call on-premise SAP S/4HANA through Cloud Connector",
+  "Private Link connectivity from SAP BTP to a hyperscaler service",
+  "SIEM and SOAR integration with SAP Enterprise Threat Detection",
+  "Joule agentic AI scenario with tools, grounding, and SAP BTP services",
+  "CAP application with SAP Fiori frontend and SAP HANA Cloud database",
+  "Event Mesh and Kafka event-driven integration across SAP systems",
+  "Hyperscaler data integration to Databricks with SAP Datasphere",
+  "CI/CD DevOps pipeline for SAP BTP applications",
+  "SAP Cloud Identity Services authentication and authorization landscape",
+  "SAP Task Center with SAP Start and workflow inbox integration",
+  "SAP Build Process Automation with approval workflows",
+  "SAP Build Work Zone launchpad and content federation",
+  "Integration Suite exposing APIs for SAP S/4HANA and third-party systems",
+  "SAP HANA Cloud multi availability zone architecture",
+  "Kyma runtime extension application on SAP BTP",
+  "SAP Analytics Cloud planning integration with SAP Datasphere",
+  "Mobile services consuming SAP backend APIs through BTP",
+  "ABAP environment side-by-side extension on SAP BTP"
+];
 
 function run(args, env = {}) {
   return execFileSync("node", [cli, ...args], {
@@ -241,15 +261,56 @@ test("ported autofix matches Python across all bundled references", () => {
   }
 });
 
-test("ported select/scaffold choose the same top template as Python oracle", () => {
-  const prompt = "Developer uses ARC-1 on SAP BTP Cloud Foundry to call on-premise SAP S/4HANA through Cloud Connector";
-  const pyTop = JSON.parse(run(["select", prompt, "--top", "1", "--json"], { BTP_DRAWIO_ENGINE: "python" }))[0];
-  const jsTop = JSON.parse(run(["select", prompt, "--top", "1", "--json"], { BTP_DRAWIO_ENGINE: "js", BTP_DRAWIO_PYTHON: "definitely-not-python" }))[0];
-  assert.equal(basename(jsTop.path), basename(pyTop.path));
+test("ported select matches Python top candidates and scores across diverse prompts", () => {
+  for (const prompt of selectParityPrompts) {
+    const pyTop = JSON.parse(run(["select", prompt, "--top", "3", "--json"], { BTP_DRAWIO_ENGINE: "python" }));
+    const jsTop = JSON.parse(run(["select", prompt, "--top", "3", "--json"], {
+      BTP_DRAWIO_ENGINE: "js",
+      BTP_DRAWIO_PYTHON: "definitely-not-python"
+    }));
+    assert.deepEqual(
+      jsTop.map((candidate) => [basename(candidate.path), candidate.score]),
+      pyTop.map((candidate) => [basename(candidate.path), candidate.score]),
+      prompt
+    );
+  }
+});
 
-  const dir = mkdtempSync(join(tmpdir(), "btp-drawio-js-scaffold-"));
-  const out = join(dir, "scaffold.drawio");
-  const scaffold = run(["scaffold", prompt, "--out", out, "--json"], { BTP_DRAWIO_ENGINE: "js", BTP_DRAWIO_PYTHON: "definitely-not-python" });
-  assert.equal(basename(JSON.parse(scaffold).template), basename(pyTop.path));
-  assert.match(readFileSync(out, "utf8"), /mxfile/);
+test("ported scaffold chooses same template as Python for diverse prompts", () => {
+  const dir = mkdtempSync(join(tmpdir(), "btp-drawio-js-scaffold-prompts-"));
+  for (const [index, prompt] of selectParityPrompts.entries()) {
+    const pyTop = JSON.parse(run(["select", prompt, "--top", "1", "--json"], { BTP_DRAWIO_ENGINE: "python" }))[0];
+    const out = join(dir, `scaffold-${index}.drawio`);
+    const scaffold = run(["scaffold", prompt, "--out", out, "--json"], {
+      BTP_DRAWIO_ENGINE: "js",
+      BTP_DRAWIO_PYTHON: "definitely-not-python"
+    });
+    assert.equal(basename(JSON.parse(scaffold).template), basename(pyTop.path), prompt);
+    assert.match(readFileSync(out, "utf8"), /mxfile/);
+  }
+});
+
+test("ported scaffold output matches Python semantically across all bundled templates", () => {
+  const dir = mkdtempSync(join(tmpdir(), "btp-drawio-js-scaffold-corpus-"));
+  const files = collectDrawioFiles(referenceDir);
+  assert.equal(files.length, 71);
+
+  for (const [index, source] of files.entries()) {
+    const fixtureDir = join(dir, String(index));
+    mkdirSync(fixtureDir);
+    const pyOut = join(fixtureDir, "python.drawio");
+    const jsOut = join(fixtureDir, "js.drawio");
+    const diagramName = `Scaffold Parity ${index}`;
+    const template = basename(source);
+
+    run(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", pyOut], {
+      BTP_DRAWIO_ENGINE: "python"
+    });
+    const jsRun = spawn(["scaffold", "--template", template, "--diagram-name", diagramName, "--out", jsOut], {
+      BTP_DRAWIO_ENGINE: "js",
+      BTP_DRAWIO_PYTHON: "definitely-not-python"
+    });
+    assert.equal(jsRun.status, 0, `${template}\n${jsRun.stderr}`);
+    assert.equal(canonicalizeXml(readFileSync(jsOut, "utf8")), canonicalizeXml(readFileSync(pyOut, "utf8")), template);
+  }
 });
