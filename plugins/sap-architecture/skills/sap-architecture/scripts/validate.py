@@ -319,6 +319,31 @@ def validate(path: Path) -> Report:
         suffix = "" if len(graphs) == 1 else f" in diagram page {graph_index + 1}"
         report.add("error", "xml", f"duplicate id {cid!r}{suffix}")
 
+    abs_geom_cache: dict[str, tuple[float, float, float, float] | None] = {}
+
+    def absolute_geom(cid: str) -> tuple[float, float, float, float] | None:
+        """Return geometry in page coordinates, resolving draw.io child parents."""
+        if cid in abs_geom_cache:
+            return abs_geom_cache[cid]
+        cell = cells.get(cid)
+        if cell is None:
+            abs_geom_cache[cid] = None
+            return None
+        g = geom(cell)
+        if not g:
+            abs_geom_cache[cid] = None
+            return None
+        x, y, w, h = g
+        parent_id = cell.get("parent")
+        if parent_id and parent_id not in {"0", "1"}:
+            parent_key = scoped_id(cell_scopes[cid], parent_id)
+            pg = absolute_geom(parent_key)
+            if pg:
+                x += pg[0]
+                y += pg[1]
+        abs_geom_cache[cid] = (x, y, w, h)
+        return abs_geom_cache[cid]
+
     # ---- style / palette ---------------------------------------------------
     palette_text = DATA_URI_RE.sub("", text)
     foreign = {m.upper() for m in HEX_RE.findall(palette_text)} - {c.upper() for c in SAP_PALETTE}
@@ -534,8 +559,8 @@ def validate(path: Path) -> Report:
         tgt = cells.get(scoped_id(scope, tgt_id))
         if src is None or tgt is None:
             continue
-        gs = geom(src)
-        gt = geom(tgt)
+        gs = absolute_geom(scoped_id(scope, src_id))
+        gt = absolute_geom(scoped_id(scope, tgt_id))
         if not gs or not gt:
             continue
         cx_s = gs[0] + gs[2] / 2
@@ -668,7 +693,7 @@ def validate(path: Path) -> Report:
     for cid, cell in cells.items():
         if cell.get("vertex") != "1":
             continue
-        g = geom(cell)
+        g = absolute_geom(cid)
         if not g or g[2] <= 0 or g[3] <= 0:
             continue
         scope = cell_scopes.get(cid, 0)
@@ -685,7 +710,8 @@ def validate(path: Path) -> Report:
         tgt = cells.get(scoped_id(scope, t_id))
         if src is None or tgt is None:
             continue
-        sg, tg = geom(src), geom(tgt)
+        sg = absolute_geom(scoped_id(scope, s_id))
+        tg = absolute_geom(scoped_id(scope, t_id))
         if not sg or not tg:
             continue
         # Endpoints: card centers (this is where draw.io draws straight edges to)
@@ -721,6 +747,8 @@ def validate(path: Path) -> Report:
             # Also skip if "other" is a transparent / chrome cell (no fill)
             other_cell = cells.get(other_id)
             if other_cell is None:
+                continue
+            if is_transparent_or_chrome(other_cell):
                 continue
             ostyle = parse_style(other_cell.get("style"))
             if ostyle.get("fillColor", "").lower() in ("none", "") and ostyle.get("shape") not in ("image",):

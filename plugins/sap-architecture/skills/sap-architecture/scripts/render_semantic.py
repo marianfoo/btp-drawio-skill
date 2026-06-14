@@ -28,6 +28,7 @@ except Exception:  # pragma: no cover - renderer still works without icons
 BLUE = "#0070F2"
 TEXT = "#1D2D3E"
 MUTED = "#475E75"
+AUTH_GREEN = "#188918"
 ZONE_FILL = "#EBF8FF"
 NEUTRAL_FILL = "#F5F6F7"
 WHITE = "#FFFFFF"
@@ -134,8 +135,8 @@ def security_operations(description: str) -> DiagramPlan:
         Box("etd", "SAP Domain Detection\n\nSAP Enterprise Threat Detection\n(Cloud Edition)", 440, 280, 240, 170, "audit log"),
         Box("analytics", "Central Security\nAnalytics\n\nFortiSIEM", 800, 250, 220, 170, None, NEUTRAL_FILL, MUTED),
         Box("response", "Security Orchestration\n& Response\n\nFortiSOAR", 800, 520, 220, 170, None, NEUTRAL_FILL, MUTED),
-        Box("notification", "Notification System", 420, 640, 150, 50, None, WHITE, MUTED),
-        Box("itsm", "ITSM System", 560, 720, 150, 50, None, WHITE, MUTED),
+        Box("notification", "Notification System", 720, 725, 170, 50, None, WHITE, MUTED),
+        Box("itsm", "ITSM System", 930, 725, 150, 50, None, WHITE, MUTED),
     ]
     edges = [
         Edge("e1", "s4", "etd"),
@@ -153,8 +154,8 @@ def security_operations(description: str) -> DiagramPlan:
         Pill("p2", "Alerts, findings &\nenriched events", 680, 335, 135, 36),
         Pill("p3", "Correlated\nIncidents", 830, 455, 100, 38),
         Pill("p4", "Status & closure\nupdates", 930, 455, 110, 38),
-        Pill("p5", "Notification", 610, 640, 125, 24),
-        Pill("p6", "Open Ticket", 610, 720, 125, 24),
+        Pill("p5", "Notification", 740, 695, 125, 24),
+        Pill("p6", "Open Ticket", 940, 695, 125, 24),
     ]
     return DiagramPlan(
         "security-operations",
@@ -177,29 +178,31 @@ def devops(description: str) -> DiagramPlan:
         Box("z-runtime", "SAP BTP Runtime", 755, 130, 340, 515, None, ZONE_FILL, BLUE),
     ]
     boxes = [
-        Box("dev", "Developer", 95, 225, 155, 62, None),
-        Box("git", "Git Repository", 95, 350, 155, 62, None),
-        Box("cicd", "SAP Continuous\nIntegration and Delivery", 255, 285, 190, 82, "continuous integration and delivery"),
-        Box("ctms", "SAP Cloud Transport\nManagement", 455, 285, 215, 82, "cloud transport management"),
-        Box("alm", "SAP Cloud ALM", 455, 445, 215, 72, None),
-        Box("cf", "Cloud Foundry\nRuntime", 790, 225, 180, 72, "cloud foundry"),
-        Box("kyma", "Kyma Runtime", 790, 350, 180, 72, None),
-        Box("abap", "ABAP Environment", 790, 475, 180, 72, "abap environment"),
+        Box("dev", "Developer", 115, 210, 165, 62, None),
+        Box("git", "Git Repository", 115, 330, 165, 62, None),
+        Box("cicd", "SAP Continuous\nIntegration and Delivery", 80, 455, 250, 82, "continuous integration and delivery"),
+        Box("ctms", "SAP Cloud Transport\nManagement", 465, 300, 210, 82, "cloud transport management"),
+        Box("alm", "SAP Cloud ALM", 465, 465, 210, 72, None),
+        Box("cf", "Cloud Foundry\nRuntime", 815, 215, 200, 72, "cloud foundry"),
+        Box("kyma", "Kyma Runtime", 815, 350, 200, 72, None),
+        Box("abap", "ABAP Environment", 815, 485, 200, 72, "abap environment"),
     ]
     edges = [
-        Edge("e1", "dev", "git", "Commit"),
-        Edge("e2", "git", "cicd", "Build & Test"),
-        Edge("e3", "cicd", "ctms", "Release"),
-        Edge("e4", "ctms", "cf", "Deploy"),
-        Edge("e5", "ctms", "kyma", "Deploy"),
-        Edge("e6", "ctms", "abap", "Deploy"),
-        Edge("e7", "alm", "ctms", "Change"),
+        Edge("e1", "dev", "git"),
+        Edge("e2", "git", "cicd"),
+        Edge("e3", "cicd", "ctms"),
+        Edge("e4", "ctms", "cf"),
+        Edge("e5", "ctms", "kyma"),
+        Edge("e6", "ctms", "abap"),
+        Edge("e7", "alm", "ctms"),
     ]
     pills = [
-        Pill("p1", "Commit", 250, 248, 82, 22),
-        Pill("p2", "Build & Test", 380, 320, 105, 22),
-        Pill("p3", "Release", 660, 320, 82, 22),
-        Pill("p4", "Deploy", 730, 245, 82, 22),
+        Pill("p1", "Commit", 155, 292, 82, 22),
+        Pill("p2", "Build & Test", 145, 418, 105, 22),
+        Pill("p3", "Release", 350, 420, 82, 22),
+        Pill("p4", "Deploy", 720, 245, 82, 22),
+        Pill("p5", "Deploy", 720, 380, 82, 22),
+        Pill("p6", "Deploy", 720, 515, 82, 22),
     ]
     return DiagramPlan("devops", title, "L2 pipeline from source to SAP BTP runtimes", PAGE_W, PAGE_H, boxes, edges, pills, zones)
 
@@ -207,29 +210,29 @@ def devops(description: str) -> DiagramPlan:
 def private_connectivity(description: str) -> DiagramPlan:
     title = title_from(description, "private-connectivity")
     zones = [
-        Box("z-btp", "SAP BTP", 90, 100, 720, 570, None, ZONE_FILL, BLUE),
-        Box("z-network", "Private Network / Hyperscaler", 850, 170, 230, 360, None, NEUTRAL_FILL, MUTED),
+        Box("z-btp", "SAP BTP", 170, 100, 700, 570, None, ZONE_FILL, BLUE),
+        Box("z-network", "Private Network / Hyperscaler", 905, 170, 225, 360, None, NEUTRAL_FILL, MUTED),
     ]
     boxes = [
-        Box("client", "Application Clients", 30, 320, 135, 62, None),
-        Box("app", "Extension Application\n(CAP / HTML5)", 260, 270, 225, 92, "cloud application programming"),
-        Box("dest", "SAP Destination\nservice", 560, 300, 155, 72, "destination"),
-        Box("identity", "SAP Cloud Identity\nServices", 300, 565, 240, 72, None),
-        Box("plink", "SAP Private Link\nservice", 720, 300, 145, 72, None),
-        Box("provider", "Provider Service\nor SAP workload", 900, 285, 145, 92, None),
+        Box("client", "Application Clients", 30, 325, 140, 62, None),
+        Box("app", "Extension Application\n(CAP / HTML5)", 245, 280, 225, 92, "cloud application programming"),
+        Box("dest", "SAP Destination\nservice", 540, 280, 155, 72, "destination"),
+        Box("identity", "SAP Cloud Identity\nServices", 335, 565, 250, 72, None),
+        Box("plink", "SAP Private Link\nservice", 710, 280, 150, 72, None),
+        Box("provider", "Provider Service\nor SAP workload", 945, 280, 160, 92, None),
     ]
     edges = [
-        Edge("e1", "client", "app", "HTTPS"),
-        Edge("e2", "app", "dest", "REST/OData"),
-        Edge("e3", "dest", "plink", "Private connection"),
-        Edge("e4", "plink", "provider", "Private Link"),
-        Edge("e5", "identity", "app", "Authenticate", "#0A6E0A"),
+        Edge("e1", "client", "app"),
+        Edge("e2", "app", "dest"),
+        Edge("e3", "dest", "plink"),
+        Edge("e4", "plink", "provider"),
+        Edge("e5", "identity", "app", stroke=AUTH_GREEN),
     ]
     pills = [
-        Pill("p1", "HTTPS", 175, 335, 82, 22),
-        Pill("p2", "REST/OData", 480, 315, 95, 22),
-        Pill("p3", "Private Link", 850, 315, 105, 22),
-        Pill("p4", "Authenticate", 510, 520, 115, 22),
+        Pill("p1", "HTTPS", 178, 345, 70, 22),
+        Pill("p2", "REST/OData", 452, 250, 95, 22),
+        Pill("p3", "Private Link", 855, 245, 105, 22),
+        Pill("p4", "Authenticate", 455, 505, 115, 22),
     ]
     return DiagramPlan("private-connectivity", title, "L2 private connectivity pattern for SAP BTP", PAGE_W, PAGE_H, boxes, edges, pills, zones)
 
@@ -283,19 +286,19 @@ def ai_agent(description: str) -> DiagramPlan:
         Box("ext", "Third-party APIs", 880, 470, 190, 62, None),
     ]
     edges = [
-        Edge("e1", "user", "joule", "Prompt"),
-        Edge("e2", "joule", "agent", "Delegate"),
-        Edge("e3", "agent", "mcp", "MCP"),
-        Edge("e4", "mcp", "s4", "Tool call"),
-        Edge("e5", "mcp", "sf", "Tool call"),
-        Edge("e6", "mcp", "ext", "REST"),
-        Edge("e7", "identity", "agent", "Authenticate", "#0A6E0A"),
+        Edge("e1", "user", "joule"),
+        Edge("e2", "joule", "agent"),
+        Edge("e3", "agent", "mcp"),
+        Edge("e4", "mcp", "s4"),
+        Edge("e5", "mcp", "sf"),
+        Edge("e6", "mcp", "ext"),
+        Edge("e7", "identity", "agent", stroke=AUTH_GREEN),
     ]
     pills = [
-        Pill("p1", "Prompt", 255, 217, 80, 22),
-        Pill("p2", "MCP", 540, 355, 70, 22),
+        Pill("p1", "HTTPS", 270, 245, 80, 22),
+        Pill("p2", "MCP", 545, 300, 70, 22),
         Pill("p3", "REST", 760, 492, 70, 22),
-        Pill("p4", "Authenticate", 545, 492, 115, 22),
+        Pill("p4", "Authenticate", 545, 455, 115, 22),
     ]
     return DiagramPlan("ai-agent", title, "L2 AI agent pattern with SAP BTP tools and identity", PAGE_W, PAGE_H, boxes, edges, pills, zones)
 
@@ -453,6 +456,8 @@ def render(plan: DiagramPlan, out: Path) -> None:
     icon_style_base = "ellipse;whiteSpace=wrap;html=1;aspect=fixed;strokeColor=#D5DADD;fillColor=#F5F6F7;"
     for box in plan.boxes:
         style = f"{card_style}strokeColor={box.stroke};fillColor={box.fill};fontColor={TEXT};"
+        if box.icon is not None:
+            style += "spacingLeft=36;"
         zone = containing_zone(box)
         parent_id = zone.id if zone else "1"
         x = box.x - zone.x if zone else box.x
