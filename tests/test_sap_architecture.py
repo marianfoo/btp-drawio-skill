@@ -27,6 +27,7 @@ def load_script(name: str):
 
 
 compare = load_script("compare")
+extract_icon = load_script("extract_icon")
 render_semantic = load_script("render_semantic")
 scaffold_diagram = load_script("scaffold_diagram")
 validate = load_script("validate")
@@ -60,6 +61,19 @@ class SelectionTests(unittest.TestCase):
         expanded = scaffold_diagram.rank_candidates(query, 1, include_external=True)[0]
         self.assertEqual("ac_RA0006_PrivateLinkService.drawio", Path(internal.path).name)
         self.assertEqual("Secure-Connectivity-with-SAP-Private-Link-service.drawio", Path(expanded.path).name)
+
+
+class IconLookupTests(unittest.TestCase):
+    def test_backend_system_query_does_not_match_wrong_btp_service_icon(self) -> None:
+        index = extract_icon.load_index()
+        self.assertTrue(extract_icon.is_backend_system_query("SAP S/4HANA"))
+        self.assertIsNone(extract_icon.find(index, "SAP S/4HANA"))
+
+    def test_cloud_connector_still_matches_service_icon(self) -> None:
+        index = extract_icon.load_index()
+        match = extract_icon.find(index, "Cloud Connector")
+        self.assertIsNotNone(match)
+        self.assertEqual("cloud-10-connector", match[0])
 
 
 class ValidateTests(unittest.TestCase):
@@ -111,8 +125,56 @@ class ValidateTests(unittest.TestCase):
         through_warnings = [i for i in report.warnings if "passes through cell" in i.msg]
         self.assertEqual([], through_warnings)
 
+    def test_orphaned_edge_is_structural_warning(self) -> None:
+        drawio = """<mxfile>
+  <diagram id="test" name="test">
+    <mxGraphModel page="1" pageWidth="800" pageHeight="600">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="a" value="Source" vertex="1" parent="1"
+          style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=12;strokeColor=#0070F2;fillColor=#FFFFFF;strokeWidth=1.5;fontFamily=Helvetica;fontSize=14;fontColor=#1D2D3E;">
+          <mxGeometry x="100" y="100" width="100" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="" edge="1" parent="1" source="a" target="missing"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#475E75;strokeWidth=1.5;fontFamily=Helvetica;fontSize=11;fontColor=#1D2D3E;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "orphaned.drawio"
+            path.write_text(drawio, encoding="utf-8")
+            report = validate.validate(path)
+
+        self.assertEqual([], report.errors)
+        self.assertTrue(any("missing target id 'missing'" in i.msg for i in report.warnings))
+
 
 class SemanticRendererTests(unittest.TestCase):
+    def test_cloud_connector_request_uses_on_prem_connectivity_archetype(self) -> None:
+        description = (
+            "Developer consumes SAP S/4HANA On-Premise from VS Code through ARC-1 "
+            "running on SAP BTP Cloud Foundry with Destination service, Connectivity "
+            "service, and SAP Cloud Connector"
+        )
+        plan = render_semantic.plan_for(description)
+        self.assertEqual("on-prem-connectivity", plan.archetype)
+        self.assertIn("SAP Cloud\nConnector", {box.label for box in plan.boxes})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "on-prem.drawio"
+            render_semantic.render(plan, out)
+            report = validate.validate(out)
+            self.assertEqual([], report.errors)
+
+    def test_cap_hana_fiori_request_uses_btp_application_not_integration_flow(self) -> None:
+        plan = render_semantic.plan_for("CAP application with SAP HANA Cloud and SAP Fiori frontend")
+        self.assertEqual("btp-application", plan.archetype)
+        self.assertIn("SAP HANA Cloud", {box.label for box in plan.boxes})
+
     def test_security_operations_renderer_validates_and_improves_template_ceiling(self) -> None:
         description = (
             "SIEM and SOAR with SAP Enterprise Threat Detection, FortiSIEM, "

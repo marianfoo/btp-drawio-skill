@@ -319,6 +319,15 @@ def validate(path: Path) -> Report:
         suffix = "" if len(graphs) == 1 else f" in diagram page {graph_index + 1}"
         report.add("error", "xml", f"duplicate id {cid!r}{suffix}")
 
+    for cid, cell in cells.items():
+        if cell.get("edge") != "1":
+            continue
+        scope = cell_scopes[cid]
+        for attr in ("source", "target"):
+            ref = cell.get(attr)
+            if ref and scoped_id(scope, ref) not in cells:
+                report.add("warning", "xml", f"edge references missing {attr} id {ref!r}", cell=cid)
+
     abs_geom_cache: dict[str, tuple[float, float, float, float] | None] = {}
 
     def absolute_geom(cid: str) -> tuple[float, float, float, float] | None:

@@ -5,7 +5,7 @@ A Claude Code plugin (and Agent-Skill-compatible standalone skill) that authors 
 Bundles:
 - **100 SAP BTP service icons** (inline SVG data URIs, grey-background-circle variant — the one [SAP mandates](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/icons.md) for diagrams)
 - **448 indexed SAP draw.io starter-kit assets** across 10 bundled libraries: BTP service icons, generic icons, connector presets, area/default shapes, essential shapes, number markers, SAP brand-name text, text elements, and annotation/interface pills
-- **63 pristine reference templates** (Apache-2.0): all 11 canonical examples from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams) plus 52 curated reference architectures from [`SAP/architecture-center`](https://github.com/SAP/architecture-center), covering IAM, Joule, MCP / Agentic AI, multitenant SaaS, DevOps, Private Link, Event-Driven Architecture, resiliency, Business Data Cloud, integration, SIEM/SOAR, and SuccessFactors
+- **71 pristine reference templates** (Apache-2.0): canonical examples from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams), curated reference architectures from [`SAP/architecture-center`](https://github.com/SAP/architecture-center), and selected external SAP references, covering IAM, Joule, MCP / Agentic AI, multitenant SaaS, DevOps, Private Link, Cloud Connector, Event-Driven Architecture, resiliency, Business Data Cloud, integration, SIEM/SOAR, and SuccessFactors
 - **10 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, corpus findings, generation-quality checklist, external-corpus guidance, researched improvement options, and the comparison methodology — every value cited from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/) or observed in SAP's public corpus
 - **A validator** (`validate.py`) that catches bent arrows, clipped labels, off-palette colors, off-grid coordinates, duplicate ids, missing `labelBackgroundColor`, and XML comments
 - **An autofixer** (`autofix.py`) that mechanically repairs grid snap, hex case, missing `absoluteArcSize=1`, wrong `strokeWidth`, non-Helvetica fonts, and stray XML comments
@@ -141,11 +141,13 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_icon.py
 ```bash
 python3 plugins/sap-architecture/skills/sap-architecture/scripts/extract_icon.py \
   "Destination Service" \
-  --x 600 --y 300 --w 80 --h 96 \
+  --x 600 --y 300 \
   --id svc-dest --parent 1
 ```
 
-Fuzzy matching is built in — `"XSUAA"`, `"CPI"`, `"HANA"`, `"Cloud Connector"`, `"Audit Log"`, `"Authorization and Trust"` all resolve correctly.
+Fuzzy matching is built in — `"XSUAA"`, `"CPI"`, `"HANA"`, `"Cloud Connector"`, `"Audit Log"`, `"Authorization and Trust"` all resolve correctly. Defaults are 32×32 px to match the SAP corpus; use 48×48 only for focal anchors.
+
+Backend systems such as `"SAP S/4HANA"` are not BTP service icons. `extract_icon.py` fails closed for those names so it does not return unrelated product-specific service icons. Use `extract_asset.py "sap-s-4hana" --kind sap-brand-name` for product text or `extract_asset.py "on-premise-sap" --kind generic-icon` for a generic backend icon.
 
 ### List or extract any SAP starter-kit asset
 
@@ -174,7 +176,7 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/select_referenc
   "Joule agent calls S/4HANA through MCP and XSUAA"
 ```
 
-The selector ranks the 63 bundled templates by curated scenario metadata, family, level, filename matches, visible labels in the draw.io file, and strong aliases such as `DevOps`, `Edge Integration Cell`, `Federated ML`, `SuccessFactors`, `Joule`, `MCP`, and `Private Link`. Use it before editing XML.
+The selector ranks the 71 bundled templates by curated scenario metadata, family, level, filename matches, visible labels in the draw.io file, and strong aliases such as `DevOps`, `Edge Integration Cell`, `Federated ML`, `SuccessFactors`, `Joule`, `MCP`, and `Private Link`. Use it before editing XML.
 
 ### Score a diagram against a SAP reference
 
@@ -378,7 +380,7 @@ The skill is an **authoring assistant**, not a one-shot generator. The realistic
 When triggered, the skill runs a 6-step pipeline (documented in full in [`plugins/sap-architecture/skills/sap-architecture/SKILL.md`](plugins/sap-architecture/skills/sap-architecture/SKILL.md)):
 
 1. **Parse → plan** — infer level (L0/L1/L2, default L2), zones, services, numbered flow steps, and which service is the "star" (accent color).
-2. **Scaffold from a SAP reference template — MANDATORY** — run `scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks the 63 bundled SAP templates against the request, copies the best match to the destination, and prints alternates. The single most common cause of bad diagrams is the LLM trying to write XML from scratch — `scaffold_diagram.py` removes that temptation. Use `template_browser.py` (pre-rendered thumbnail gallery of all 63) when picking visually is faster than reading filenames.
+2. **Scaffold from a SAP reference template — MANDATORY** — run `scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks the 71 bundled SAP templates against the request, copies the best match to the destination, and prints alternates. The single most common cause of bad diagrams is the LLM trying to write XML from scratch — `scaffold_diagram.py` removes that temptation. Use `template_browser.py` (pre-rendered thumbnail gallery of all 71) when picking visually is faster than reading filenames.
 3. **Place BTP service icons** — fuzzy-lookup each service via `extract_icon.py`, which emits an `<mxCell>` with the official inline-SVG data URI and grid-snapped geometry.
 4. **Surgical relabel** — change labels, swap services, add a few cards next to the existing ones. **Preserve canvas size, zone hierarchy, network divider, SAP logos, footer, and identity flow.** For complex scenarios that need more than relabeling, open the file in draw.io desktop and edit directly. Reference docs: `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`, `do-and-dont.md`, `manual-workflow.md`.
 5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (now catches dark page backgrounds, novelty pill verbs like PROMPT/ROUTE/CONTEXT/DELEGATE, multi-logo over-use), then `score_corpus.py --min-score 90`.
@@ -459,7 +461,7 @@ btp-drawio-skill/
                 │   └── methodology.md     ← comparison harness, fidelity claim
                 ├── assets/
                 │   ├── libraries/         ← 10 SAP draw.io libraries (Apache-2.0)
-                │   ├── reference-examples/ ← 63 pristine SAP templates (Apache-2.0)
+                │   ├── reference-examples/ ← 71 pristine SAP templates (Apache-2.0)
                 │   │   └── template-metadata.json ← curated selector aliases/tags
                 │   ├── icon-index.json    ← pre-computed slug→mxCell style lookup
                 │   ├── asset-index.json   ← 448 searchable SAP starter-kit assets
@@ -471,6 +473,7 @@ btp-drawio-skill/
                     ├── build_asset_index.py
                     ├── extract_icon.py
                     ├── extract_asset.py
+                    ├── render_semantic.py  ← deterministic fallback renderer
                     ├── check_asset_coverage.py
                     ├── validate.py
                     ├── autofix.py

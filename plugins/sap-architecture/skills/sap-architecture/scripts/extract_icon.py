@@ -56,6 +56,25 @@ def _tokens(text: str) -> set[str]:
     return {tok for tok in _normalize(text).split() if tok}
 
 
+def is_backend_system_query(query: str) -> bool:
+    """Return True for backend product names that are not BTP service icons."""
+    normalized = _normalize(query)
+    compact = re.sub(r"[^a-z0-9]+", "", query.lower())
+    if normalized in {"sap s 4hana", "sap s 4hana cloud", "s 4hana", "s 4hana cloud"}:
+        return True
+    if compact in {"s4hana", "saps4hana", "s4hanacloud", "saps4hanacloud"}:
+        return True
+    return False
+
+
+def backend_system_guidance(query: str) -> str:
+    return (
+        f"'{query}' is a backend system/product label, not a BTP service icon. "
+        "Use extract_asset.py \"sap-s-4hana\" --kind sap-brand-name for the label "
+        "or extract_asset.py \"on-premise-sap\" --kind generic-icon for a generic backend icon."
+    )
+
+
 # Hand-curated aliases for common SAP service abbreviations / nicknames.
 # These map a user-typed query → a slug substring that uniquely identifies the icon.
 COMMON_ALIASES: dict[str, str] = {
@@ -86,6 +105,8 @@ COMMON_ALIASES: dict[str, str] = {
 
 
 def find(index: dict, query: str) -> tuple[str, dict] | None:
+    if is_backend_system_query(query):
+        return None
     q = query.lower().strip()
     qslug = re.sub(r"[^a-z0-9]+", "-", q).strip("-")
     # curated alias table
@@ -174,6 +195,10 @@ def main() -> int:
     if not args.query:
         ap.print_usage(sys.stderr)
         return 2
+
+    if is_backend_system_query(args.query):
+        print(backend_system_guidance(args.query), file=sys.stderr)
+        return 1
 
     if asset_index and find_general_asset and emit_general_asset:
         asset_match = find_general_asset(asset_index, args.query, "btp-service-icon")

@@ -24,6 +24,11 @@ try:
 except Exception:  # pragma: no cover - renderer still works without icons
     extract_icon = None
 
+try:
+    import extract_asset  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover - renderer still works without generic assets
+    extract_asset = None
+
 
 BLUE = "#0070F2"
 TEXT = "#1D2D3E"
@@ -97,12 +102,20 @@ def snap(value: int | float) -> int:
 def infer_archetype(description: str) -> str:
     tokens = words(description)
     joined = " ".join(tokens)
+    lower = description.lower()
     if tokens & {"siem", "soar", "threat", "etd"} or "security operations" in description.lower():
         return "security-operations"
     if tokens & {"devops", "cicd", "pipeline", "transport"}:
         return "devops"
-    if tokens & {"privatelink", "private", "connector", "cloudconnector"}:
+    cloud_connector = "cloud connector" in lower or "cloudconnector" in tokens or ({"cloud", "connector"} <= tokens)
+    on_premise = bool(tokens & {"onprem", "onpremise"}) or "on-premise" in lower or "on premise" in lower
+    backend_access = bool(tokens & {"s4", "s4hana", "destination", "connectivity", "vscode", "arc", "arc1"})
+    if cloud_connector or (on_premise and backend_access):
+        return "on-prem-connectivity"
+    if tokens & {"privatelink", "private"}:
         return "private-connectivity"
+    if tokens & {"cap", "fiori", "hana", "html5", "approuter"}:
+        return "btp-application"
     if tokens & {"a2a", "b2b", "b2g", "api", "integration", "eventmesh"}:
         return "integration-flow"
     if tokens & {"joule", "agentic", "agents", "mcp", "llm"} or "ai agent" in joined:
@@ -117,7 +130,9 @@ def title_from(description: str, archetype: str) -> str:
     defaults = {
         "security-operations": "Security Operations with SAP ETD and SOAR",
         "devops": "DevOps on SAP BTP",
+        "on-prem-connectivity": "On-Premise Connectivity on SAP BTP",
         "private-connectivity": "Private Connectivity on SAP BTP",
+        "btp-application": "SAP BTP Application Architecture",
         "integration-flow": "Integration Flow on SAP BTP",
         "ai-agent": "AI Agents on SAP BTP",
     }
@@ -127,7 +142,7 @@ def title_from(description: str, archetype: str) -> str:
 def security_operations(description: str) -> DiagramPlan:
     title = title_from(description, "security-operations")
     boxes = [
-        Box("s4", "SAP S/4HANA\nOn-Premise Solutions", 40, 145, 250, 72, "sap s/4hana"),
+        Box("s4", "SAP S/4HANA\nOn-Premise Solutions", 40, 145, 250, 72, "on-premise-sap"),
         Box("rise", "RISE", 40, 235, 250, 72, None),
         Box("cloud", "SAP Cloud\nSolutions", 40, 325, 250, 72, "cloud foundry"),
         Box("btp", "SAP BTP", 40, 415, 250, 72, None),
@@ -237,6 +252,78 @@ def private_connectivity(description: str) -> DiagramPlan:
     return DiagramPlan("private-connectivity", title, "L2 private connectivity pattern for SAP BTP", PAGE_W, PAGE_H, boxes, edges, pills, zones)
 
 
+def on_prem_connectivity(description: str) -> DiagramPlan:
+    title = title_from(description, "on-prem-connectivity")
+    zones = [
+        Box("z-dev", "Developer Workstation", 40, 155, 215, 420, None, NEUTRAL_FILL, MUTED),
+        Box("z-btp", "SAP BTP - Cloud Foundry", 300, 100, 520, 560, None, ZONE_FILL, BLUE),
+        Box("z-onprem", "Customer On-Premise Network", 875, 155, 250, 420, None, NEUTRAL_FILL, MUTED),
+    ]
+    boxes = [
+        Box("vscode", "Visual Studio\nCode", 75, 300, 150, 70, None),
+        Box("arc1", "ARC-1 Application\nCloud Foundry Runtime", 365, 235, 210, 90, "cloud foundry"),
+        Box("dest", "SAP Destination\nservice", 615, 235, 165, 72, "destination"),
+        Box("conn", "SAP Connectivity\nservice", 615, 385, 165, 72, "connectivity"),
+        Box("identity", "SAP Cloud Identity\nServices / XSUAA", 405, 535, 255, 72, "xsuaa"),
+        Box("cloudconn", "SAP Cloud\nConnector", 930, 235, 160, 72, "cloud connector"),
+        Box("s4", "SAP S/4HANA\nOn-Premise", 930, 400, 160, 72, "on-premise-sap"),
+    ]
+    edges = [
+        Edge("e1", "vscode", "arc1"),
+        Edge("e2", "arc1", "dest"),
+        Edge("e3", "dest", "conn"),
+        Edge("e4", "conn", "cloudconn"),
+        Edge("e5", "cloudconn", "s4"),
+        Edge("e6", "identity", "arc1", stroke=AUTH_GREEN),
+    ]
+    pills = [
+        Pill("p1", "HTTPS", 250, 325, 70, 22),
+        Pill("p2", "Destination", 545, 205, 100, 22),
+        Pill("p3", "Connectivity", 645, 335, 105, 22),
+        Pill("p4", "OData/REST", 955, 355, 105, 22),
+        Pill("p5", "Authenticate", 505, 495, 115, 22),
+    ]
+    return DiagramPlan(
+        "on-prem-connectivity",
+        title,
+        "L2 developer-to-on-premise flow through SAP BTP Cloud Foundry",
+        PAGE_W,
+        PAGE_H,
+        boxes,
+        edges,
+        pills,
+        zones,
+    )
+
+
+def btp_application(description: str) -> DiagramPlan:
+    title = title_from(description, "btp-application")
+    zones = [
+        Box("z-user", "Users and Channels", 55, 155, 240, 430, None, NEUTRAL_FILL, MUTED),
+        Box("z-btp", "SAP BTP", 350, 100, 720, 560, None, ZONE_FILL, BLUE),
+    ]
+    boxes = [
+        Box("user", "Business User", 95, 290, 160, 62, None),
+        Box("fiori", "SAP Fiori /\nApp Router", 430, 205, 185, 72, None),
+        Box("cap", "CAP Service", 430, 350, 185, 72, "cloud application programming"),
+        Box("hana", "SAP HANA Cloud", 750, 350, 190, 72, "hana cloud"),
+        Box("identity", "SAP Cloud Identity\nServices / XSUAA", 500, 535, 255, 72, "xsuaa"),
+    ]
+    edges = [
+        Edge("e1", "user", "fiori"),
+        Edge("e2", "fiori", "cap"),
+        Edge("e3", "cap", "hana"),
+        Edge("e4", "identity", "cap", stroke=AUTH_GREEN),
+    ]
+    pills = [
+        Pill("p1", "HTTPS", 300, 235, 70, 22),
+        Pill("p2", "OData/REST", 475, 305, 105, 22),
+        Pill("p3", "SQL", 635, 375, 70, 22),
+        Pill("p4", "Authenticate", 560, 495, 115, 22),
+    ]
+    return DiagramPlan("btp-application", title, "L2 application pattern with SAP BTP runtime and data service", PAGE_W, PAGE_H, boxes, edges, pills, zones)
+
+
 def integration_flow(description: str) -> DiagramPlan:
     title = title_from(description, "integration-flow")
     zones = [
@@ -245,7 +332,7 @@ def integration_flow(description: str) -> DiagramPlan:
         Box("z-receivers", "Receiver Systems", 850, 150, 255, 470, None, NEUTRAL_FILL, MUTED),
     ]
     boxes = [
-        Box("sender1", "SAP S/4HANA", 95, 250, 170, 62, None),
+        Box("sender1", "SAP S/4HANA", 95, 250, 170, 62, "on-premise-sap"),
         Box("sender2", "Third-party\nApplication", 95, 390, 170, 72, None),
         Box("cpi", "Cloud Integration", 470, 230, 210, 72, "integration suite"),
         Box("api", "API Management", 470, 370, 210, 72, None),
@@ -254,11 +341,11 @@ def integration_flow(description: str) -> DiagramPlan:
         Box("receiver2", "Partner / B2B\nSystem", 895, 430, 170, 72, None),
     ]
     edges = [
-        Edge("e1", "sender1", "cpi", "OData/REST"),
-        Edge("e2", "sender2", "api", "API"),
-        Edge("e3", "cpi", "receiver1", "Process Integration"),
-        Edge("e4", "api", "receiver2", "Managed API"),
-        Edge("e5", "event", "receiver1", "Events"),
+        Edge("e1", "sender1", "cpi"),
+        Edge("e2", "sender2", "api"),
+        Edge("e3", "cpi", "receiver1"),
+        Edge("e4", "api", "receiver2"),
+        Edge("e5", "event", "receiver1"),
     ]
     pills = [
         Pill("p1", "OData/REST", 310, 260, 105, 22),
@@ -304,13 +391,15 @@ def ai_agent(description: str) -> DiagramPlan:
 
 
 def generic_btp(description: str) -> DiagramPlan:
-    return integration_flow(description)
+    return btp_application(description)
 
 
 PLANNERS = {
     "security-operations": security_operations,
     "devops": devops,
+    "on-prem-connectivity": on_prem_connectivity,
     "private-connectivity": private_connectivity,
+    "btp-application": btp_application,
     "integration-flow": integration_flow,
     "ai-agent": ai_agent,
     "generic-btp": generic_btp,
@@ -318,18 +407,40 @@ PLANNERS = {
 
 
 def icon_style(query: str | None) -> str | None:
-    if not query or extract_icon is None:
+    if not query:
+        return None
+    if extract_icon is not None:
+        try:
+            index = extract_icon.load_index()
+            match = extract_icon.find(index, query)
+        except SystemExit:
+            match = None
+        except Exception:
+            match = None
+        if match:
+            return match[1].get("style")
+    if extract_asset is None:
         return None
     try:
-        index = extract_icon.load_index()
-        match = extract_icon.find(index, query)
+        asset_index = extract_asset.load_index()
+        match = extract_asset.find_asset(asset_index, query, None)
+        if not match:
+            return None
+        _, asset = match
+        if asset.get("kind") not in {"generic-icon", "sap-brand-name"}:
+            return None
+        library_entry = extract_asset.load_library_entry(asset)
     except SystemExit:
         return None
     except Exception:
         return None
-    if not match:
+    data = library_entry.get("data")
+    if not data:
         return None
-    return match[1].get("style")
+    return (
+        "shape=image;verticalLabelPosition=bottom;verticalAlign=top;aspect=fixed;"
+        f"imageAspect=0;image={data};"
+    )
 
 
 def cell(parent: ET.Element, cell_id: str, value: str, style: str, x: int, y: int, w: int, h: int, *, parent_id: str = "1") -> ET.Element:

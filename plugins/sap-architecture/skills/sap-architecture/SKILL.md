@@ -24,7 +24,7 @@ That script ranks the 71 bundled SAP templates and, when present, cached officia
 
 If the user asks "use the X template", pass `--template ac_X.drawio` to the scaffold instead. If you genuinely need to inspect candidates first without copying, pass `--dry-run`.
 
-If the scaffolded family is visibly wrong and no SAP reference is close enough, use `render_semantic.py` as a constrained fallback for supported archetypes (`security-operations`, `devops`, `private-connectivity`, `integration-flow`, `ai-agent`). This is still deterministic SAP-style XML, not freehand XML.
+If the scaffolded family is visibly wrong and no SAP reference is close enough, use `render_semantic.py` as a constrained fallback for supported archetypes (`security-operations`, `devops`, `on-prem-connectivity`, `private-connectivity`, `btp-application`, `integration-flow`, `ai-agent`). This is still deterministic SAP-style XML, not freehand XML.
 
 The validate.py / compare.py gates will reject weak generations: dark `pageBackgroundColor` is now an error, novelty pill verbs are warnings, missing zones lower the score against the chosen reference, and all bundled references must score 100 against themselves.
 
@@ -86,7 +86,16 @@ Known anchor templates:
 - Focused **A2A / MCP** flow → `ac_RA0029_A2A_MCP.drawio`.
 - **Joule tool ecosystem** overview → `ac_RA0029_JouleAgentsToolsEcosystem.drawio`.
 
-After scaffold has copied a template, **preserve all of it** — title band, zone containers, legend (if any), SAP logos, network divider, Architecture Center footer / QR / reference id (if any), identity flow placement, and the selected template's canvas size. For new diagrams without a clear source template, use `1169 × 827`. Rename `<diagram name="…">` to your subject. Prefer surgical relabeling over deletion. If cards or edges must change, duplicate existing template cells and keep similar zone density, icon count, pill count, and connector rhythm. The fastest way to a good diagram is renaming labels, swapping icons in-place, and adding a few cards next to the existing ones; the slowest way is rewriting the file.
+After scaffold has copied a template, **preserve the SAP visual frame** — title band, zone containers, legend (if any), SAP logos, network divider, Architecture Center footer / QR / reference id (if any), identity flow placement, and the selected template's canvas size. For new diagrams without a clear source template, use `1169 × 827`. Rename `<diagram name="…">` to your subject. Prefer surgical relabeling over deletion. If cards or edges must change, duplicate existing template cells and keep similar zone density, icon count, pill count, and connector rhythm. The fastest way to a good diagram is renaming labels, swapping icons in-place, and adding a few cards next to the existing ones; the slowest way is rewriting the file.
+
+If the user's scenario is **simpler than the chosen template**, thin the template deliberately instead of preserving irrelevant branches:
+
+1. Keep the frame, zones, footer, colors, icon scale, and main connector rhythm.
+2. Pick the single main flow first; delete only whole unused branches (card + its incoming/outgoing edges + its pills/number markers).
+3. Never leave dangling edge references. After each deletion pass, run `validate.py`; orphaned edges are structural warnings that generated diagrams should fix before delivery.
+4. Re-space cards as groups inside their zones; keep sibling cards aligned on common x/y centers and keep at least 40 px between cards and pills.
+5. Prefer moving pills into connector gaps over adding edge text. If a pill no longer explains a real edge, delete it with that branch.
+6. If thinning removes more than roughly one third of the template, switch to `render_semantic.py` or pick a simpler SAP reference template.
 
 For Architecture Center templates such as `ac_RA0029_AgenticAI_root.drawio`, do **not** replace the white canvas, footer, network divider, or SAP-branded area structure with a dark dashboard layout. If the user asks for a "legend" but the chosen template has no separate bottom legend, satisfy that by preserving the existing inline pills/labels and printing the flow narration after the diagram.
 
@@ -109,7 +118,9 @@ python3 .claude/skills/sap-architecture/scripts/render_semantic.py \
   "<request>" --archetype security-operations --out <destination.drawio>
 ```
 
-Supported archetypes: `security-operations`, `devops`, `private-connectivity`, `integration-flow`, `ai-agent`. After semantic rendering, run the same autofix / validate / render-review loop. If a proper SAP template exists, prefer the template; semantic fallback is for escaping a bad nearest-template geometry ceiling.
+Supported archetypes: `security-operations`, `devops`, `on-prem-connectivity`, `private-connectivity`, `btp-application`, `integration-flow`, `ai-agent`.
+
+Use `on-prem-connectivity` for SAP Cloud Connector / SAP Connectivity service / SAP Destination service / on-premise SAP S/4HANA flows, including ARC-1 from VS Code through Cloud Foundry. Use `btp-application` for generic Fiori/App Router/CAP/HANA Cloud application diagrams that are not integration-suite flows. After semantic rendering, run the same autofix / validate / render-review loop. If a proper SAP template exists, prefer the template; semantic fallback is for escaping a bad nearest-template geometry ceiling.
 
 ### 3. Place BTP service icons from the bundled library
 
@@ -136,7 +147,9 @@ The script:
 
 To list all available icons: `extract_icon.py --list`
 
-Common service → canonical library name hints: "Destination Service" → `sap-destination-service`, "XSUAA" / "Authorization & Trust" → `sap-authorization-and-trust-management-service`, "Cloud Connector" → `cloud-connector`, "Audit Log" → `sap-audit-log-service`.
+Common service → canonical library name hints: "Destination Service" → `sap-destination-service`, "Connectivity Service" → `sap-connectivity-service`, "XSUAA" / "Authorization & Trust" → `sap-authorization-and-trust-management-service`, "Cloud Connector" → `cloud-connector`, "Audit Log" → `sap-audit-log-service`.
+
+Backend products such as `SAP S/4HANA` are not BTP service icons. Do **not** let `extract_icon.py "SAP S/4HANA"` select `SAP S/4HANA for Microsoft Teams`; the script now fails closed for that query. Use `extract_asset.py "sap-s-4hana" --kind sap-brand-name` for a product label or `extract_asset.py "on-premise-sap" --kind generic-icon` for a generic backend icon.
 
 For non-service SAP starter-kit assets, use `extract_asset.py` instead. It covers the full indexed library surface: BTP service icons, generic icons, connector presets, area/default shapes, essential shapes, number markers, SAP brand-name text, text elements, and annotation/interface pills.
 
@@ -309,7 +322,7 @@ python3 .claude/skills/sap-architecture/scripts/template_browser.py
 open .cache/template-browser/index.html
 ```
 
-Pre-renders all 63 bundled SAP templates into a thumbnail grid with filter, domain badges, and the `scaffold_diagram.py --template <name>` invocation for each.
+Pre-renders all 71 bundled SAP templates into a thumbnail grid with filter, domain badges, and the `scaffold_diagram.py --template <name>` invocation for each.
 
 ### 6. Export (if requested) + narrate the flow
 
