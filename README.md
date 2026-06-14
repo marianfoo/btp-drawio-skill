@@ -111,8 +111,9 @@ BTP / on-prem architecture diagram, follow the 6-step workflow in SKILL.md:
 2. ALWAYS scaffold from a SAP reference template (NEVER write XML from scratch):
      scripts/scaffold_diagram.py "<request>" --out <destination>.drawio
 3. Place BTP service icons via scripts/extract_icon.py / extract_asset.py
-4. Make surgical label edits — do NOT rewrite the file. Preserve canvas size,
-   zone hierarchy, network divider, SAP logos, footer, and identity flow.
+4. Make surgical label edits with scripts/relabel.py where possible — do NOT
+   rewrite the file. Preserve canvas size, zone hierarchy, network divider,
+   SAP logos, footer, and identity flow.
 5. MANDATORY: run scripts/autofix.py --write <file>, scripts/validate.py
    <file>, and scripts/score_corpus.py --min-score 90 <file>
    # for semantic fallback output: scripts/score_corpus.py --min-sap-like 90 <file>
@@ -385,7 +386,7 @@ When triggered, the skill runs a 6-step pipeline (documented in full in [`plugin
 1. **Parse → plan** — infer level (L0/L1/L2, default L2), zones, services, numbered flow steps, and which service is the "star" (accent color).
 2. **Scaffold from a SAP reference template — MANDATORY** — run `scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks the 71 bundled SAP templates against the request, copies the best match to the destination, and prints alternates. The single most common cause of bad diagrams is the LLM trying to write XML from scratch — `scaffold_diagram.py` removes that temptation. Use `template_browser.py` (pre-rendered thumbnail gallery of all 71) when picking visually is faster than reading filenames.
 3. **Place BTP service icons** — fuzzy-lookup each service via `extract_icon.py`, which emits an `<mxCell>` with the official inline-SVG data URI and grid-snapped geometry.
-4. **Surgical relabel** — change labels, swap services, add a few cards next to the existing ones. **Preserve canvas size, zone hierarchy, network divider, SAP logos, footer, and identity flow.** For complex scenarios that need more than relabeling, open the file in draw.io desktop and edit directly. Reference docs: `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`, `do-and-dont.md`, `manual-workflow.md`.
+4. **Surgical relabel** — change labels with `relabel.py` where possible, swap services, add a few cards next to the existing ones. **Preserve canvas size, zone hierarchy, network divider, SAP logos, footer, and identity flow.** For complex scenarios that need more than relabeling, open the file in draw.io desktop and edit directly. Reference docs: `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`, `do-and-dont.md`, `manual-workflow.md`.
 5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (now catches dark page backgrounds, novelty pill verbs like PROMPT/ROUTE/CONTEXT/DELEGATE, multi-logo over-use), then `score_corpus.py --min-score 90` for template-derived diagrams or `score_corpus.py --min-sap-like 90` for semantic fallback diagrams.
 5b. **Visual review (the missing last 20%)** — `render_compare.py <ref>.drawio <cand>.drawio --open` builds an HTML page with side-by-side rendered PNGs, structural score breakdown, and **actionable suggestions mapped to the lowest-scoring fingerprint dimensions**. The fingerprint score is necessary but insufficient; the visual review catches what XML diffing can't.
 6. **Narrate the flow** — print a numbered list explaining what each pill means, for pasting below the embedded image in Markdown / Confluence.
@@ -476,6 +477,7 @@ btp-drawio-skill/
                     ├── build_asset_index.py
                     ├── extract_icon.py
                     ├── extract_asset.py
+                    ├── relabel.py         ← deterministic id/visible-label replacement helper
                     ├── render_semantic.py  ← deterministic fallback renderer
                     ├── check_asset_coverage.py
                     ├── validate.py

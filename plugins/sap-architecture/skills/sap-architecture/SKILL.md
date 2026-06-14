@@ -172,6 +172,15 @@ You scaffolded from a SAP template in step 2. Now make the *minimum* edits requi
 - Add or swap icons via `extract_icon.py` / `extract_asset.py`.
 - Adjust connector source/target if you swapped services.
 
+Prefer the deterministic relabel helper for bulk label edits before hand-editing XML:
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/relabel.py scaffold.drawio labels.json \
+  --out candidate.drawio
+```
+
+Use either a visible-label map (`{"Old visible label": "New label"}`) or an explicit id map (`{"ids": {"cell-id": "New label"}, "labels": {...}}`). The helper matches visible labels after stripping HTML wrappers and treating `<br>` as whitespace, so it is safer than ad-hoc search/replace.
+
 **Do NOT touch:** canvas size, zone hierarchy (e.g. don't nest Joule inside BTP if the reference puts them side by side), network divider, SAP logos, footer band, identity-flow placement. Those carry the SAP visual identity; preserving them is what keeps the score above 90.
 
 For complex scenarios that require more than label edits, switch into **Nudge mode** below — it converges via small, scored steps with vision feedback, and is much more reliable than trying to land everything in one pass. The manual draw.io workflow (`references/manual-workflow.md`) remains the safety net for the last 20% of polish.
@@ -385,6 +394,7 @@ sap-architecture/
     ├── build_asset_index.py       — regenerate asset-index.json after library refresh
     ├── extract_icon.py            — fuzzy service name → mxCell with grid-snapped geometry
     ├── extract_asset.py           — fuzzy any SAP starter-kit asset → mxCell snippet
+    ├── relabel.py                 — deterministic id/visible-label replacement helper
     ├── check_asset_coverage.py    — smoke-check library/index/palette coverage
     ├── scaffold_diagram.py        — copy the closest SAP template to a destination (FIRST STEP)
     ├── render_semantic.py         — deterministic SAP-style fallback for ceiling-limited archetypes

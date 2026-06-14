@@ -97,6 +97,9 @@ COMMON_ALIASES: dict[str, str] = {
     "build apps": "sap-build-apps",
     "build process": "sap-build-process-automation",
     "build code": "sap-build-code",
+    "build work zone": "sap-build-work-zone-10-standard-edition",
+    "sap build work zone": "sap-build-work-zone-10-standard-edition",
+    "work zone": "sap-build-work-zone-10-standard-edition",
     "joule": "joule-studio",
     "task center": "sap-task-center",
     "cpi": "cloud-10-integration",
@@ -200,8 +203,12 @@ def main() -> int:
         print(backend_system_guidance(args.query), file=sys.stderr)
         return 1
 
-    if asset_index and find_general_asset and emit_general_asset:
-        asset_match = find_general_asset(asset_index, args.query, "btp-service-icon")
+    prefer_icon_index = args.query.lower().strip() in COMMON_ALIASES
+    if asset_index and find_general_asset and emit_general_asset and not prefer_icon_index:
+        try:
+            asset_match = find_general_asset(asset_index, args.query, "btp-service-icon")
+        except SystemExit:
+            asset_match = None
         if asset_match:
             slug, asset = asset_match
             print(emit_general_asset(asset, args))

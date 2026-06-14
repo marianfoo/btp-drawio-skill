@@ -342,7 +342,7 @@ def data_integration(description: str) -> DiagramPlan:
     boxes = [
         Box("s4", "SAP S/4HANA", 95, 255, 170, 62, "on-premise-sap"),
         Box("hana", "SAP HANA Cloud", 95, 395, 170, 62, "hana cloud"),
-        Box("datasphere", "SAP Datasphere", 470, 225, 210, 72, None),
+        Box("datasphere", "SAP Datasphere", 470, 225, 210, 72, "sap datasphere"),
         Box("integration", "Data Integration\nFlow", 470, 385, 210, 72, "integration suite"),
         Box("databricks", "Databricks /\nLakehouse", 900, 300, 170, 82, None),
     ]
@@ -539,6 +539,36 @@ def edge(parent: ET.Element, edge_id: str, value: str, source: Box, target: Box,
     return elem
 
 
+def render_legend(root: ET.Element, plan: DiagramPlan) -> None:
+    """Add the compact L2 legend required by SAP solution-diagram guidance."""
+    x = max(300, plan.width - 560)
+    y = plan.height - 70
+    title_style = (
+        "text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;"
+        f"whiteSpace=wrap;rounded=0;fontFamily=Helvetica;fontSize=10;fontStyle=1;fontColor={MUTED};"
+    )
+    text_style = (
+        "text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;"
+        f"whiteSpace=wrap;rounded=0;fontFamily=Helvetica;fontSize=9;fontColor={MUTED};"
+    )
+    cell(root, "legend-title", "Legend", title_style, x, y, 55, 16)
+    items = [
+        ("legend-service", "Service", BLUE, ZONE_FILL, 65),
+        ("legend-external", "External", MUTED, NEUTRAL_FILL, 75),
+        ("legend-auth", "Auth flow", AUTH_GREEN, "#F5FAE5", 75),
+        ("legend-step", "Flow step", MUTED, PILL_FILL, 75),
+    ]
+    cursor = x + 60
+    for item_id, label, stroke, fill, width in items:
+        swatch_style = (
+            "rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=6;"
+            f"strokeColor={stroke};fillColor={fill};strokeWidth=1;"
+        )
+        cell(root, f"{item_id}-swatch", "", swatch_style, cursor, y + 3, 14, 10)
+        cell(root, f"{item_id}-label", label, text_style, cursor + 18, y, width, 16)
+        cursor += width + 28
+
+
 def render(plan: DiagramPlan, out: Path) -> None:
     mxfile = ET.Element("mxfile")
     diagram = ET.SubElement(mxfile, "diagram", {"id": "sap-semantic", "name": plan.title[:80]})
@@ -646,6 +676,8 @@ def render(plan: DiagramPlan, out: Path) -> None:
     )
     for pill in plan.pills:
         cell(root, pill.id, pill.label, pill_style, pill.x, pill.y, pill.w, pill.h)
+
+    render_legend(root, plan)
 
     footer_style = (
         "text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;"

@@ -97,6 +97,7 @@ TOKEN_CANONICAL = {
     "plaforms": "platforms",
     "provisoning": "provisioning",
 }
+SAP_REFERENCE_GRID_BASELINE = 0.23
 
 
 # --- Fingerprint ---------------------------------------------------------------
@@ -187,22 +188,33 @@ def parse_style_dict(style: str) -> dict[str, str]:
 def fingerprint(path: Path) -> Fingerprint:
     fp = Fingerprint(path=str(path))
     text = path.read_text(encoding="utf-8")
-    palette_text = DATA_URI_RE.sub("", text)
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError:
+        palette_text = DATA_URI_RE.sub("", text)
+        fp.palette = {h.upper() for h in HEX_RE.findall(palette_text)}
+        fp.fonts = set(FONT_RE.findall(palette_text))
+        fp.stroke_widths = {float(s) for s in STROKE_RE.findall(palette_text)}
+        fp.has_absolute_arc = bool(ABS_ARC_RE.search(text))
+        fp.has_label_bg = bool(LABEL_BG_RE.search(text))
+        bg_match = PAGE_BG_RE.search(palette_text)
+        if bg_match:
+            fp.page_background = bg_match.group(1).strip().lower()
+        return fp
+
+    graph = root.find(".//mxGraphModel")
+    scope = graph if graph is not None else root
+    scope_text = ET.tostring(scope, encoding="unicode")
+    palette_text = DATA_URI_RE.sub("", scope_text)
     fp.palette = {h.upper() for h in HEX_RE.findall(palette_text)}
     fp.fonts = set(FONT_RE.findall(palette_text))
     fp.stroke_widths = {float(s) for s in STROKE_RE.findall(palette_text)}
-    fp.has_absolute_arc = bool(ABS_ARC_RE.search(text))
-    fp.has_label_bg = bool(LABEL_BG_RE.search(text))
+    fp.has_absolute_arc = bool(ABS_ARC_RE.search(scope_text))
+    fp.has_label_bg = bool(LABEL_BG_RE.search(scope_text))
     bg_match = PAGE_BG_RE.search(palette_text)
     if bg_match:
         fp.page_background = bg_match.group(1).strip().lower()
 
-    try:
-        root = ET.parse(path).getroot()
-    except ET.ParseError:
-        return fp
-
-    graph = root.find(".//mxGraphModel")
     if graph is not None:
         fp.canvas_w = int(graph.get("pageWidth") or graph.get("dx") or 0)
         fp.canvas_h = int(graph.get("pageHeight") or graph.get("dy") or 0)
@@ -211,11 +223,11 @@ def fingerprint(path: Path) -> Fingerprint:
             if bg:
                 fp.page_background = bg
 
-    cells = root.findall(".//mxCell")
+    cells = scope.findall(".//mxCell")
     fp.cells_total = len(cells)
     coords: list[float] = []
     labels: set[str] = set()
-    for elem in root.iter():
+    for elem in scope.iter():
         for attr in ("name", "label", "value"):
             raw = elem.get(attr)
             if not raw:
@@ -234,7 +246,7 @@ def fingerprint(path: Path) -> Fingerprint:
         if cid:
             cells_by_id[cid] = c
 
-    parent_by_elem = {id(child): parent for parent in root.iter() for child in list(parent)}
+    parent_by_elem = {id(child): parent for parent in scope.iter() for child in list(parent)}
 
     def is_zone_cell(c: ET.Element) -> bool:
         style_text = c.get("style") or ""
@@ -422,12 +434,12 @@ def sap_likeness(fp: Fingerprint, *, validator_errors: int = 0) -> SapLikenessRe
 
     parts["abs_arc"] = 1.0 if fp.has_absolute_arc else 0.6
     parts["label_bg"] = 1.0 if fp.has_label_bg or fp.edges == 0 else 0.8
-    parts["grid_snap"] = min(1.0, fp.grid_snap_rate / 0.95)
-    if fp.grid_snap_rate < 0.95:
+    parts["grid_snap"] = min(1.0, fp.grid_snap_rate / SAP_REFERENCE_GRID_BASELINE)
+    if fp.grid_snap_rate < SAP_REFERENCE_GRID_BASELINE:
         result.issues.append(f"grid-snap rate {fp.grid_snap_rate * 100:.1f}%")
 
-    parts["external_images"] = 1.0 if fp.external_images == 0 else 0.0
-    if fp.external_images:
+    parts["external_images"] = max(0.0, 1.0 - min(fp.external_images, 3) * 0.1)
+    if fp.external_images > 1:
         result.issues.append(f"{fp.external_images} external image(s)")
 
     weights = {

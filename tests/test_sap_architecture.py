@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
+from statistics import median
 from pathlib import Path
 
 
@@ -30,6 +33,7 @@ compare = load_script("compare")
 autofix = load_script("autofix")
 extract_icon = load_script("extract_icon")
 render_semantic = load_script("render_semantic")
+relabel = load_script("relabel")
 scaffold_diagram = load_script("scaffold_diagram")
 validate = load_script("validate")
 
@@ -63,6 +67,50 @@ class CompareTests(unittest.TestCase):
             report = validate.validate(out)
             quality = compare.sap_likeness(compare.fingerprint(out), validator_errors=len(report.errors))
         self.assertGreaterEqual(quality.score, 90.0)
+
+    def test_sap_likeness_scores_real_sap_agentic_reference_above_gate(self) -> None:
+        path = REFERENCE_DIR / "ac_RA0029_AgenticAI_root.drawio"
+        quality = compare.sap_likeness(compare.fingerprint(path))
+        self.assertGreaterEqual(quality.score, 90.0)
+
+    def test_sap_likeness_reference_corpus_median_is_above_gate(self) -> None:
+        scores = [
+            compare.sap_likeness(compare.fingerprint(path)).score
+            for path in sorted(REFERENCE_DIR.glob("*.drawio"))
+        ]
+        self.assertEqual(71, len(scores))
+        self.assertGreaterEqual(median(scores), 90.0)
+
+    def test_fingerprint_scopes_multipage_files_to_first_page(self) -> None:
+        drawio = """<mxfile>
+  <diagram id="page-1" name="First">
+    <mxGraphModel page="1" pageWidth="100" pageHeight="100">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page-2" name="Second">
+    <mxGraphModel page="1" pageWidth="2000" pageHeight="1200">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="z1" value="Zone" vertex="1" parent="1"
+          style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=16;strokeColor=#0070F2;fillColor=#EBF8FF;strokeWidth=1.5;fontFamily=Helvetica;">
+          <mxGeometry x="100" y="100" width="500" height="300" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "multi.drawio"
+            path.write_text(drawio, encoding="utf-8")
+            fp = compare.fingerprint(path)
+        self.assertEqual((100, 100), (fp.canvas_w, fp.canvas_h))
+        self.assertEqual(2, fp.cells_total)
+        self.assertEqual(0, fp.zones)
 
     def test_sap_likeness_rejects_dark_unstructured_diagram(self) -> None:
         drawio = """<mxfile>
@@ -138,6 +186,57 @@ class IconLookupTests(unittest.TestCase):
         match = extract_icon.find(index, "Cloud Connector")
         self.assertIsNotNone(match)
         self.assertEqual("cloud-10-connector", match[0])
+
+    def test_build_work_zone_ambiguous_query_prefers_standard_edition(self) -> None:
+        index = extract_icon.load_index()
+        match = extract_icon.find(index, "Build Work Zone")
+        self.assertIsNotNone(match)
+        self.assertEqual("sap-build-work-zone-10-standard-edition", match[0])
+
+    def test_datasphere_icon_is_available_for_semantic_renderer(self) -> None:
+        self.assertIsNotNone(render_semantic.icon_style("sap datasphere"))
+
+
+class RelabelTests(unittest.TestCase):
+    def test_relabel_by_id_and_visible_label_preserves_simple_wrapper(self) -> None:
+        drawio = """<mxfile>
+  <diagram id="test" name="test">
+    <mxGraphModel page="1" pageWidth="800" pageHeight="600">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="zone-title" value="&lt;b&gt;Old&lt;br&gt;Zone&lt;/b&gt;" vertex="1" parent="1"
+          style="text;html=1;fontFamily=Helvetica;">
+          <mxGeometry x="20" y="20" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="plain" value="Plain Label" vertex="1" parent="1"
+          style="text;html=1;fontFamily=Helvetica;">
+          <mxGeometry x="20" y="80" width="120" height="40" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"""
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "in.drawio"
+            mapping = Path(tmp) / "labels.json"
+            out = Path(tmp) / "out.drawio"
+            src.write_text(drawio, encoding="utf-8")
+            mapping.write_text(
+                json.dumps(
+                    {
+                        "ids": {"zone-title": "New\nZone"},
+                        "labels": {"Plain Label": "Renamed Label"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            replacements = relabel.relabel_file(src, mapping, out)
+            cells = {cell.get("id"): cell for cell in ET.parse(out).getroot().iter("mxCell")}
+
+        self.assertEqual(2, len(replacements))
+        self.assertEqual("<b>New<br>Zone</b>", cells["zone-title"].get("value"))
+        self.assertEqual("Renamed Label", cells["plain"].get("value"))
 
 
 class ValidateTests(unittest.TestCase):
@@ -246,6 +345,19 @@ class SemanticRendererTests(unittest.TestCase):
     def test_hyperscaler_data_integration_routes_to_data_integration(self) -> None:
         plan = render_semantic.plan_for("Hyperscaler data integration from SAP S/4HANA to Databricks")
         self.assertEqual("data-integration", plan.archetype)
+
+    def test_semantic_renderer_adds_l2_legend(self) -> None:
+        plan = render_semantic.plan_for("CAP application with SAP HANA Cloud and SAP Fiori frontend")
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "app.drawio"
+            render_semantic.render(plan, out)
+            labels = {
+                compare.clean_label(cell.get("value") or "")
+                for cell in ET.parse(out).getroot().iter("mxCell")
+            }
+            report = validate.validate(out)
+        self.assertIn("Legend", labels)
+        self.assertEqual([], report.errors)
 
     def test_ai_agent_uses_joule_as_separate_purple_zone(self) -> None:
         plan = render_semantic.plan_for("AI agent with SAP Joule, MCP, and SAP S/4HANA")
