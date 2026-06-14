@@ -231,7 +231,7 @@ export async function main() {
         write: z.boolean().optional().describe("Modify the file in place and create a .bak backup.")
       }
     },
-    async ({ file, write }) => runTool("autofix.py", toArgs([file, write ? "--write" : undefined]))
+    async ({ file, write }) => runEngineTool("autofix", "autofix.py", toArgs([file, write ? "--write" : undefined]))
   );
 
   server.registerTool(

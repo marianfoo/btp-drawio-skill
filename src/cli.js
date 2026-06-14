@@ -1,10 +1,11 @@
+import { autofix } from "./tools/autofix.js";
 import { extractAsset } from "./tools/extract-asset.js";
 import { extractIcon } from "./tools/extract-icon.js";
 import { relabel } from "./tools/relabel.js";
 import { scaffoldDiagram } from "./tools/scaffold.js";
 import { selectReference } from "./tools/select.js";
 
-export const JS_COMMANDS = new Set(["extract-asset", "extract-icon", "relabel", "scaffold", "select"]);
+export const JS_COMMANDS = new Set(["autofix", "extract-asset", "extract-icon", "relabel", "scaffold", "select"]);
 
 function takeValue(args, index, flag) {
   if (index + 1 >= args.length) {
@@ -85,6 +86,10 @@ function parseCommonOptions(args, spec = {}) {
 
 export async function runJsCommand(command, args) {
   try {
+    if (command === "autofix") {
+      const { options, positionals } = parseCommonOptions(args);
+      return autofix({ ...options, file: positionals[0] });
+    }
     if (command === "extract-icon") {
       const { options, positionals } = parseCommonOptions(args);
       return extractIcon({ ...options, query: positionals.join(" ").trim() });

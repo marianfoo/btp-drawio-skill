@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -10,11 +10,12 @@ import { fileURLToPath } from "node:url";
 const repoRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const serverPath = join(repoRoot, "bin", "btp-drawio-mcp.js");
 
-async function withClient(callback) {
+async function withClient(callback, env = {}) {
   const transport = new StdioClientTransport({
     command: "node",
     args: [serverPath],
     cwd: repoRoot,
+    env: { ...process.env, ...env },
     stderr: "pipe"
   });
   const client = new Client({ name: "btp-drawio-mcp-test", version: "0.0.0" });
@@ -47,6 +48,30 @@ test("mcp server exposes complete user-facing tool surface", async () => {
       "btp_drawio_validate"
     ]);
   });
+});
+
+test("mcp autofix runs through JS engine without Python", async () => {
+  await withClient(
+    async (client) => {
+      const dir = mkdtempSync(join(tmpdir(), "btp-drawio-mcp-js-autofix-"));
+      const file = join(dir, "dirty.drawio");
+      writeFileSync(
+        file,
+        `<mxfile><diagram name="x"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><!-- remove --><mxCell id="2" value="Box" style="rounded=1;arcSize=12;strokeColor=#abcdef;strokeWidth=1.2;fontFamily=Arial;" vertex="1" parent="1"><mxGeometry x="12" y="19" width="101.5" height="39.9" as="geometry"/></mxCell></root></mxGraphModel></diagram></mxfile>`
+      );
+
+      const result = await client.callTool({
+        name: "btp_drawio_autofix",
+        arguments: { file, write: true }
+      });
+      assert.equal(result.isError, false);
+      const fixed = readFileSync(file, "utf8");
+      assert.match(fixed, /strokeColor=#ABCDEF/);
+      assert.match(fixed, /absoluteArcSize=1/);
+      assert.doesNotMatch(fixed, /<!-- remove -->/);
+    },
+    { BTP_DRAWIO_ENGINE: "js", BTP_DRAWIO_PYTHON: "definitely-not-python" }
+  );
 });
 
 test("mcp tools support inline relabel JSON, asset extraction, autofix, and JSON validation output", async () => {
