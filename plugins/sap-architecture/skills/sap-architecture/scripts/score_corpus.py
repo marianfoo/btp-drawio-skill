@@ -9,6 +9,7 @@ Usage:
   score_corpus.py my-diagram.drawio
   score_corpus.py --top 10 --min-score 90 my-diagram.drawio
   score_corpus.py --references /path/to/SAP/architecture-center my-diagram.drawio
+  score_corpus.py --min-sap-like 90 semantic-diagram.drawio
 """
 from __future__ import annotations
 
@@ -18,7 +19,8 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from compare import compare, fingerprint
+from compare import compare, fingerprint, sap_likeness
+from validate import validate
 
 
 @dataclass
@@ -55,8 +57,10 @@ def main() -> int:
     )
     ap.add_argument("--top", type=int, default=5)
     ap.add_argument("--min-score", type=float, default=None, help="exit 1 if best score is below this value")
+    ap.add_argument("--min-sap-like", type=float, default=None, help="exit 1 if reference-free SAP-likeness is below this value")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--score", action="store_true", help="print only the best score")
+    ap.add_argument("--sap-score", action="store_true", help="print only the reference-free SAP-likeness score")
     args = ap.parse_args()
 
     if not args.candidate.exists():
@@ -70,6 +74,8 @@ def main() -> int:
         return 2
 
     candidate_fp = fingerprint(args.candidate)
+    validation_report = validate(args.candidate)
+    quality = sap_likeness(candidate_fp, validator_errors=len(validation_report.errors))
     ranked: list[RankedScore] = []
     for ref in refs:
         result = compare(fingerprint(ref), candidate_fp)
@@ -80,18 +86,25 @@ def main() -> int:
 
     if args.score:
         print(f"{best:.1f}")
+    elif args.sap_score:
+        print(f"{quality.score:.1f}")
     elif args.json:
-        print(json.dumps([asdict(r) for r in top], indent=2))
+        print(json.dumps({"sap_likeness": asdict(quality), "ranked": [asdict(r) for r in top]}, indent=2))
     else:
         print(f"candidate : {args.candidate}")
         print(f"references: {len(refs)}")
-        print(f"best      : {best:.1f}/100")
+        print(f"best      : {best:.1f}/100 corpus similarity")
+        print(f"sap-like  : {quality.score:.1f}/100 reference-free quality")
+        if quality.issues:
+            print(f"sap issues: {quality.issues[0]}")
         for i, item in enumerate(top, 1):
             print(f"{i}. {item.score:5.1f}  {item.reference}")
             if item.diffs:
                 print(f"   - {item.diffs[0]}")
 
     if args.min_score is not None and best < args.min_score:
+        return 1
+    if args.min_sap_like is not None and quality.score < args.min_sap_like:
         return 1
     return 0
 

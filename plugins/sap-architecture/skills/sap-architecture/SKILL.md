@@ -24,7 +24,7 @@ That script ranks the 71 bundled SAP templates and, when present, cached officia
 
 If the user asks "use the X template", pass `--template ac_X.drawio` to the scaffold instead. If you genuinely need to inspect candidates first without copying, pass `--dry-run`.
 
-If the scaffolded family is visibly wrong and no SAP reference is close enough, use `render_semantic.py` as a constrained fallback for supported archetypes (`security-operations`, `devops`, `on-prem-connectivity`, `private-connectivity`, `btp-application`, `integration-flow`, `ai-agent`). This is still deterministic SAP-style XML, not freehand XML.
+If the scaffolded family is visibly wrong and no SAP reference is close enough, use `render_semantic.py` as a constrained fallback for supported archetypes (`security-operations`, `devops`, `on-prem-connectivity`, `private-connectivity`, `btp-application`, `data-integration`, `integration-flow`, `ai-agent`). This is still deterministic SAP-style XML, not freehand XML.
 
 The validate.py / compare.py gates will reject weak generations: dark `pageBackgroundColor` is now an error, novelty pill verbs are warnings, missing zones lower the score against the chosen reference, and all bundled references must score 100 against themselves.
 
@@ -118,9 +118,9 @@ python3 .claude/skills/sap-architecture/scripts/render_semantic.py \
   "<request>" --archetype security-operations --out <destination.drawio>
 ```
 
-Supported archetypes: `security-operations`, `devops`, `on-prem-connectivity`, `private-connectivity`, `btp-application`, `integration-flow`, `ai-agent`.
+Supported archetypes: `security-operations`, `devops`, `on-prem-connectivity`, `private-connectivity`, `btp-application`, `data-integration`, `integration-flow`, `ai-agent`.
 
-Use `on-prem-connectivity` for SAP Cloud Connector / SAP Connectivity service / SAP Destination service / on-premise SAP S/4HANA flows, including ARC-1 from VS Code through Cloud Foundry. Use `btp-application` for generic Fiori/App Router/CAP/HANA Cloud application diagrams that are not integration-suite flows. After semantic rendering, run the same autofix / validate / render-review loop. If a proper SAP template exists, prefer the template; semantic fallback is for escaping a bad nearest-template geometry ceiling.
+Use `on-prem-connectivity` for SAP Cloud Connector / SAP Connectivity service / SAP Destination service / on-premise SAP S/4HANA flows, including ARC-1 from VS Code through Cloud Foundry. Use `btp-application` for generic Fiori/App Router/CAP/HANA Cloud application diagrams that are not integration-suite flows. Use `data-integration` for SAP-to-hyperscaler data movement such as Databricks, Snowflake, lakehouse, Datasphere, or data warehouse prompts. After semantic rendering, run the same autofix / validate / render-review loop. If a proper SAP template exists, prefer the template; semantic fallback is for escaping a bad nearest-template geometry ceiling.
 
 ### 3. Place BTP service icons from the bundled library
 
@@ -280,6 +280,12 @@ python3 .claude/skills/sap-architecture/scripts/validate.py my-diagram.drawio
 python3 .claude/skills/sap-architecture/scripts/score_corpus.py --min-score 90 my-diagram.drawio
 ```
 
+For diagrams produced by `render_semantic.py`, the corpus similarity score is expected to be lower because the diagram is not a near-copy of one template. Gate those with the reference-free SAP-likeness score instead:
+
+```bash
+python3 .claude/skills/sap-architecture/scripts/score_corpus.py --min-sap-like 90 my-diagram.drawio
+```
+
 **Autofix** handles the mechanical issues: grid snapping, hex case, missing `absoluteArcSize=1`, wrong `strokeWidth`, wrong `fontFamily`.
 
 **Validate** catches everything the LLM can't easily self-police:
@@ -293,7 +299,7 @@ python3 .claude/skills/sap-architecture/scripts/score_corpus.py --min-score 90 m
 
 **Do not skip this step.** The validator replaces five rounds of "look at the screenshot and tell me what's wrong". If it reports any error, fix it and re-run. Warnings are acceptable if the user has explicitly asked for something off-convention; otherwise fix them.
 
-`score_corpus.py` compares the candidate against every bundled SAP template and fails if the best match is below 90. If it fails, loop:
+`score_corpus.py` reports two different scores: corpus similarity, which is the right gate for template-derived diagrams, and SAP-likeness, which is the right gate for semantic fallback diagrams. If corpus similarity fails for a template-derived candidate, loop:
 
 1. Run `compare.py <chosen-template.drawio> my-diagram.drawio`.
 2. Restore the template's canvas, zone density, icon count, pill count, palette, and line styles where the diff shows drift.

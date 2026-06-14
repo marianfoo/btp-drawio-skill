@@ -27,6 +27,7 @@ def load_script(name: str):
 
 
 compare = load_script("compare")
+autofix = load_script("autofix")
 extract_icon = load_script("extract_icon")
 render_semantic = load_script("render_semantic")
 scaffold_diagram = load_script("scaffold_diagram")
@@ -49,6 +50,69 @@ class CompareTests(unittest.TestCase):
         result = compare.compare(fp, fp)
         self.assertEqual(100.0, result.score)
         self.assertEqual(1.0, result.breakdown["pill_vocab"])
+
+    def test_sap_likeness_scores_semantic_output_without_template_similarity(self) -> None:
+        description = (
+            "Developer consumes SAP S/4HANA On-Premise from VS Code through ARC-1 "
+            "running on SAP BTP Cloud Foundry with Destination service, Connectivity "
+            "service, and SAP Cloud Connector"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "on-prem.drawio"
+            render_semantic.render(render_semantic.plan_for(description), out)
+            report = validate.validate(out)
+            quality = compare.sap_likeness(compare.fingerprint(out), validator_errors=len(report.errors))
+        self.assertGreaterEqual(quality.score, 90.0)
+
+    def test_sap_likeness_rejects_dark_unstructured_diagram(self) -> None:
+        drawio = """<mxfile>
+  <diagram id="test" name="test">
+    <mxGraphModel page="1" pageWidth="800" pageHeight="600" pageBackgroundColor="#123456">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="a" value="Prompt" vertex="1" parent="1"
+          style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;strokeColor=#FF00FF;fillColor=#000000;fontFamily=Comic Sans MS;">
+          <mxGeometry x="13" y="17" width="123" height="31" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bad.drawio"
+            path.write_text(drawio, encoding="utf-8")
+            report = validate.validate(path)
+            quality = compare.sap_likeness(compare.fingerprint(path), validator_errors=len(report.errors))
+        self.assertLess(quality.score, 70.0)
+
+
+class AutofixTests(unittest.TestCase):
+    def test_apply_all_repairs_common_mechanical_issues_and_is_idempotent(self) -> None:
+        raw = """<mxfile><!-- remove me -->
+  <diagram id="test" name="test">
+    <mxGraphModel page="1" pageWidth="801" pageHeight="599">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="a" value="Card" vertex="1" parent="1"
+          style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;strokeColor=#0070f2;fillColor=#ffffff;strokeWidth=1.2;fontFamily=Arial;">
+          <mxGeometry x="13" y="27" width="101" height="59" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"""
+        fixed, stats = autofix.apply_all(raw)
+        fixed_again, stats_again = autofix.apply_all(fixed)
+        self.assertGreater(sum(stats.values()), 0)
+        self.assertEqual(fixed, fixed_again)
+        self.assertEqual(0, sum(stats_again.values()))
+        self.assertNotIn("<!--", fixed)
+        self.assertIn("absoluteArcSize=1", fixed)
+        self.assertIn("strokeColor=#0070F2", fixed)
+        self.assertIn("strokeWidth=1", fixed)
+        self.assertIn("fontFamily=Helvetica", fixed)
 
 
 class SelectionTests(unittest.TestCase):
@@ -174,6 +238,21 @@ class SemanticRendererTests(unittest.TestCase):
         plan = render_semantic.plan_for("CAP application with SAP HANA Cloud and SAP Fiori frontend")
         self.assertEqual("btp-application", plan.archetype)
         self.assertIn("SAP HANA Cloud", {box.label for box in plan.boxes})
+
+    def test_event_mesh_phrase_routes_to_integration_flow(self) -> None:
+        plan = render_semantic.plan_for("Event Mesh integration from SAP S/4HANA to a Kafka consumer")
+        self.assertEqual("integration-flow", plan.archetype)
+
+    def test_hyperscaler_data_integration_routes_to_data_integration(self) -> None:
+        plan = render_semantic.plan_for("Hyperscaler data integration from SAP S/4HANA to Databricks")
+        self.assertEqual("data-integration", plan.archetype)
+
+    def test_ai_agent_uses_joule_as_separate_purple_zone(self) -> None:
+        plan = render_semantic.plan_for("AI agent with SAP Joule, MCP, and SAP S/4HANA")
+        zone_by_id = {zone.id: zone for zone in plan.zones}
+        self.assertIn("z-joule", zone_by_id)
+        self.assertEqual("#5D36FF", zone_by_id["z-joule"].stroke)
+        self.assertEqual("#F1ECFF", zone_by_id["z-joule"].fill)
 
     def test_security_operations_renderer_validates_and_improves_template_ceiling(self) -> None:
         description = (

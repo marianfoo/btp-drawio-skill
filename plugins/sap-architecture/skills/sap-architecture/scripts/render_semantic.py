@@ -34,6 +34,8 @@ BLUE = "#0070F2"
 TEXT = "#1D2D3E"
 MUTED = "#475E75"
 AUTH_GREEN = "#188918"
+INDIGO = "#5D36FF"
+INDIGO_FILL = "#F1ECFF"
 ZONE_FILL = "#EBF8FF"
 NEUTRAL_FILL = "#F5F6F7"
 WHITE = "#FFFFFF"
@@ -114,6 +116,11 @@ def infer_archetype(description: str) -> str:
         return "on-prem-connectivity"
     if tokens & {"privatelink", "private"}:
         return "private-connectivity"
+    if "event mesh" in lower or tokens & {"eventmesh", "kafka"}:
+        return "integration-flow"
+    data_integration = bool(tokens & {"databricks", "snowflake", "lakehouse", "warehouse", "datasphere"})
+    if data_integration or ("data integration" in lower and "hyperscaler" in lower):
+        return "data-integration"
     if tokens & {"cap", "fiori", "hana", "html5", "approuter"}:
         return "btp-application"
     if tokens & {"a2a", "b2b", "b2g", "api", "integration", "eventmesh"}:
@@ -133,6 +140,7 @@ def title_from(description: str, archetype: str) -> str:
         "on-prem-connectivity": "On-Premise Connectivity on SAP BTP",
         "private-connectivity": "Private Connectivity on SAP BTP",
         "btp-application": "SAP BTP Application Architecture",
+        "data-integration": "Data Integration on SAP BTP",
         "integration-flow": "Integration Flow on SAP BTP",
         "ai-agent": "AI Agents on SAP BTP",
     }
@@ -255,9 +263,9 @@ def private_connectivity(description: str) -> DiagramPlan:
 def on_prem_connectivity(description: str) -> DiagramPlan:
     title = title_from(description, "on-prem-connectivity")
     zones = [
-        Box("z-dev", "Developer Workstation", 40, 155, 215, 420, None, NEUTRAL_FILL, MUTED),
-        Box("z-btp", "SAP BTP - Cloud Foundry", 300, 100, 520, 560, None, ZONE_FILL, BLUE),
-        Box("z-onprem", "Customer On-Premise Network", 875, 155, 250, 420, None, NEUTRAL_FILL, MUTED),
+        Box("z-dev", "Developer Workstation", 40, 220, 215, 240, None, NEUTRAL_FILL, MUTED),
+        Box("z-btp", "SAP BTP - Cloud Foundry", 300, 120, 520, 500, None, ZONE_FILL, BLUE),
+        Box("z-onprem", "Customer On-Premise Network", 875, 190, 250, 340, None, NEUTRAL_FILL, MUTED),
     ]
     boxes = [
         Box("vscode", "Visual Studio\nCode", 75, 300, 150, 70, None),
@@ -299,8 +307,8 @@ def on_prem_connectivity(description: str) -> DiagramPlan:
 def btp_application(description: str) -> DiagramPlan:
     title = title_from(description, "btp-application")
     zones = [
-        Box("z-user", "Users and Channels", 55, 155, 240, 430, None, NEUTRAL_FILL, MUTED),
-        Box("z-btp", "SAP BTP", 350, 100, 720, 560, None, ZONE_FILL, BLUE),
+        Box("z-user", "Users and Channels", 55, 220, 240, 250, None, NEUTRAL_FILL, MUTED),
+        Box("z-btp", "SAP BTP", 350, 120, 720, 500, None, ZONE_FILL, BLUE),
     ]
     boxes = [
         Box("user", "Business User", 95, 290, 160, 62, None),
@@ -322,6 +330,35 @@ def btp_application(description: str) -> DiagramPlan:
         Pill("p4", "Authenticate", 560, 495, 115, 22),
     ]
     return DiagramPlan("btp-application", title, "L2 application pattern with SAP BTP runtime and data service", PAGE_W, PAGE_H, boxes, edges, pills, zones)
+
+
+def data_integration(description: str) -> DiagramPlan:
+    title = title_from(description, "data-integration")
+    zones = [
+        Box("z-sources", "Enterprise Data Sources", 55, 170, 250, 410, None, NEUTRAL_FILL, MUTED),
+        Box("z-btp", "SAP BTP - Data Integration", 360, 120, 430, 510, None, ZONE_FILL, BLUE),
+        Box("z-platform", "Hyperscaler Data Platform", 850, 170, 260, 410, None, NEUTRAL_FILL, MUTED),
+    ]
+    boxes = [
+        Box("s4", "SAP S/4HANA", 95, 255, 170, 62, "on-premise-sap"),
+        Box("hana", "SAP HANA Cloud", 95, 395, 170, 62, "hana cloud"),
+        Box("datasphere", "SAP Datasphere", 470, 225, 210, 72, None),
+        Box("integration", "Data Integration\nFlow", 470, 385, 210, 72, "integration suite"),
+        Box("databricks", "Databricks /\nLakehouse", 900, 300, 170, 82, None),
+    ]
+    edges = [
+        Edge("e1", "s4", "datasphere"),
+        Edge("e2", "hana", "integration"),
+        Edge("e3", "datasphere", "databricks"),
+        Edge("e4", "integration", "databricks"),
+    ]
+    pills = [
+        Pill("p1", "Data Federation", 305, 260, 120, 22),
+        Pill("p2", "Data Sync", 305, 410, 95, 22),
+        Pill("p3", "HTTPS", 785, 285, 70, 22),
+        Pill("p4", "Metadata", 785, 410, 85, 22),
+    ]
+    return DiagramPlan("data-integration", title, "L2 data integration pattern between SAP and hyperscaler platforms", PAGE_W, PAGE_H, boxes, edges, pills, zones)
 
 
 def integration_flow(description: str) -> DiagramPlan:
@@ -359,15 +396,16 @@ def ai_agent(description: str) -> DiagramPlan:
     title = title_from(description, "ai-agent")
     zones = [
         Box("z-user", "Users and Channels", 45, 155, 220, 430, None, NEUTRAL_FILL, MUTED),
-        Box("z-btp", "SAP BTP", 315, 100, 455, 560, None, ZONE_FILL, BLUE),
+        Box("z-joule", "SAP Joule", 315, 120, 455, 210, None, INDIGO_FILL, INDIGO),
+        Box("z-btp", "SAP BTP", 315, 370, 455, 290, None, ZONE_FILL, BLUE),
         Box("z-sap", "SAP Cloud and Enterprise Systems", 835, 155, 280, 430, None, NEUTRAL_FILL, MUTED),
     ]
     boxes = [
         Box("user", "Business User", 80, 265, 150, 62, None),
-        Box("joule", "SAP Joule", 385, 195, 180, 72, "joule"),
-        Box("agent", "AI Agent /\nOrchestrator", 385, 330, 180, 82, None),
-        Box("mcp", "MCP / Tool\nGateway", 575, 330, 160, 82, None),
-        Box("identity", "SAP Cloud Identity\nServices", 400, 530, 250, 72, None),
+        Box("joule", "SAP Joule", 455, 220, 180, 72, "joule"),
+        Box("agent", "AI Agent /\nOrchestrator", 385, 420, 180, 82, None),
+        Box("mcp", "MCP / Tool\nGateway", 575, 420, 160, 82, None),
+        Box("identity", "SAP Cloud Identity\nServices", 400, 555, 250, 72, None),
         Box("s4", "SAP S/4HANA", 880, 240, 190, 62, None),
         Box("sf", "SAP SuccessFactors", 880, 355, 190, 62, None),
         Box("ext", "Third-party APIs", 880, 470, 190, 62, None),
@@ -383,9 +421,9 @@ def ai_agent(description: str) -> DiagramPlan:
     ]
     pills = [
         Pill("p1", "HTTPS", 270, 245, 80, 22),
-        Pill("p2", "MCP", 545, 300, 70, 22),
+        Pill("p2", "MCP", 545, 390, 70, 22),
         Pill("p3", "REST", 760, 492, 70, 22),
-        Pill("p4", "Authenticate", 545, 455, 115, 22),
+        Pill("p4", "Authenticate", 545, 525, 115, 22),
     ]
     return DiagramPlan("ai-agent", title, "L2 AI agent pattern with SAP BTP tools and identity", PAGE_W, PAGE_H, boxes, edges, pills, zones)
 
@@ -400,6 +438,7 @@ PLANNERS = {
     "on-prem-connectivity": on_prem_connectivity,
     "private-connectivity": private_connectivity,
     "btp-application": btp_application,
+    "data-integration": data_integration,
     "integration-flow": integration_flow,
     "ai-agent": ai_agent,
     "generic-btp": generic_btp,

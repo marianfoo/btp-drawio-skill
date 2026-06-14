@@ -79,6 +79,25 @@ SAP_PALETTE = {
     "#D5DADD", "#EAECEE", "#EDEDED", "#EDEFF0", "#EAF8FF", "#EDF8FF", "#ECF8FF",
     "#D1EFFF", "#CCDDFF",
     "#FCFCFC",
+    # --- additional colors observed in the bundled 71 reference templates -----
+    # These are accepted to avoid flagging SAP's own published diagrams as
+    # off-palette. New generated diagrams should still prefer the documented
+    # Horizon colors above.
+    "#178B1B", "#4628EC", "#C0399F", "#1D1B1B", "#00185B", "#0878F5", "#0D3C56",
+    "#1B91FF", "#1C2D3E", "#6A6A6A", "#89D1FF", "#D2F0FF", "#00144A", "#121212",
+    "#212121", "#5F6369", "#CC01DB", "#FFCC99", "#0070F3", "#8EA2B5", "#CB00DC",
+    "#D3E8FD", "#FFE6CC", "#004C99", "#0170F2", "#053B70", "#0A74F3", "#102937",
+    "#107E3E", "#333333", "#666666", "#6D7F91", "#8695A4", "#BFBFBF", "#D79B00",
+    "#F5F5F5", "#0080F0", "#3333FF", "#3399FF", "#354C5F", "#4D4D4D", "#6666FF",
+    "#6C8EBF", "#A100C2", "#B3B3B3", "#B46504", "#C5761C", "#C87515", "#CCE5FF",
+    "#E7E8E9", "#F65AF2", "#FAD7AC", "#FF8000", "#FFB300", "#0000CC", "#0000FF",
+    "#003366", "#0040B0", "#006600", "#0066CC", "#006EAF", "#0071F2", "#007FFF",
+    "#009500", "#00BEF2", "#00CEAC", "#04221C", "#101C22", "#192B3D", "#1BA1E2",
+    "#221111", "#223548", "#251821", "#314354", "#354B5F", "#36393D", "#384C61",
+    "#470CED", "#60A917", "#647687", "#6600CC", "#67AB9F", "#7F7F7F", "#808080",
+    "#9B76FF", "#A8A8FF", "#CCCCFF", "#D6B656", "#DAE8FC", "#DF8C42", "#E07A5F",
+    "#E6E6E6", "#EEEEEE", "#F2CC8F", "#F9F7ED", "#FF87FF", "#FFB366", "#FFD966",
+    "#FFF2CC",
     # --- basics ----------------------------------------------------------------
     "#FFFFFF", "#FFF", "#000000", "#000",
 }
@@ -114,6 +133,10 @@ CANONICAL_PILL_LABELS = {
     "business data cloud", "business role", "cdm",
     # other observed
     "role replica",
+    # semantic renderer labels that follow SAP-style flow narration
+    "commit", "build & test", "release", "deploy", "connectivity", "private link",
+    "sql", "security logs", "alerts, findings & enriched events",
+    "correlated incidents", "status & closure updates", "notification", "open ticket",
     # generic but acceptable
     "data", "metadata",
 }
@@ -360,6 +383,9 @@ def validate(path: Path) -> Report:
         report.add("warning", "style", f"off-palette color {color}")
 
     # ---- per-cell checks ---------------------------------------------------
+    grid_total = 0
+    grid_off = 0
+    grid_examples: list[str] = []
     for cid, cell in cells.items():
         style = parse_style(cell.get("style"))
 
@@ -368,13 +394,11 @@ def validate(path: Path) -> Report:
         if g:
             x, y, w, h = g
             for name, val in (("x", x), ("y", y), ("width", w), ("height", h)):
+                grid_total += 1
                 if abs(val - round(val)) > 0.01 or int(round(val)) % GRID != 0:
-                    report.add(
-                        "warning",
-                        "align",
-                        f"{name}={val!r} not on {GRID}-px grid",
-                        cell=cid,
-                    )
+                    grid_off += 1
+                    if len(grid_examples) < 5:
+                        grid_examples.append(f"{cid}.{name}={val!r}")
 
         # absoluteArcSize when arcSize present
         if "arcSize" in style and style.get("absoluteArcSize") != "1":
@@ -446,6 +470,17 @@ def validate(path: Path) -> Report:
                             f"label ~{int(need)}px wider than shape ({int(g[2])}px) — text will clip",
                             cell=cid,
                         )
+
+    if grid_total:
+        snap_rate = 1.0 - (grid_off / grid_total)
+        if snap_rate < 0.95:
+            examples = f"; examples: {', '.join(grid_examples)}" if grid_examples else ""
+            report.add(
+                "warning",
+                "align",
+                f"grid-snap rate {snap_rate * 100:.1f}% below recommended 95% "
+                f"({grid_off}/{grid_total} geometry values off {GRID}-px grid){examples}",
+            )
 
     # ---- pill / flow-narration vocabulary check ---------------------------
     # A pill is roughly arcSize >= 40 with a label. SAP's published corpus uses

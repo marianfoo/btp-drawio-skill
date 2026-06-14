@@ -9,7 +9,7 @@ Bundles:
 - **10 reference sheets** with the exact Horizon hex values, Helvetica typography hierarchy, shape / edge style strings, canvas layout, do-and-don't rules, corpus findings, generation-quality checklist, external-corpus guidance, researched improvement options, and the comparison methodology — every value cited from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/) or observed in SAP's public corpus
 - **A validator** (`validate.py`) that catches bent arrows, clipped labels, off-palette colors, off-grid coordinates, duplicate ids, missing `labelBackgroundColor`, and XML comments
 - **An autofixer** (`autofix.py`) that mechanically repairs grid snap, hex case, missing `absoluteArcSize=1`, wrong `strokeWidth`, non-Helvetica fonts, and stray XML comments
-- **A metadata-aware template selector + comparison harness** (`select_reference.py`, `compare.py`, `score_corpus.py`) that picks the nearest SAP template, fingerprints a `.drawio`, and reports a 0-100 fidelity score — the empirical justification for the "always start from a template" workflow
+- **A metadata-aware template selector + comparison harness** (`select_reference.py`, `compare.py`, `score_corpus.py`) that picks the nearest SAP template, fingerprints a `.drawio`, reports corpus similarity, and reports a reference-free SAP-likeness score for semantic fallback diagrams
 
 > **Why a dedicated skill?** Reproducing SAP Architecture Center style by hand or via a generic drawio skill consistently produces off-style output — wrong palette, bent `orthogonalEdgeStyle` arrows, clipped labels, text bleeding into `#EBF8FF` BTP fills, blank icon stencils (`shape=mxgraph.sap.icon;SAPIcon=…` doesn't render in many installs). This plugin bakes in the rules that matter and gates every output behind a validator.
 
@@ -115,6 +115,7 @@ BTP / on-prem architecture diagram, follow the 6-step workflow in SKILL.md:
    zone hierarchy, network divider, SAP logos, footer, and identity flow.
 5. MANDATORY: run scripts/autofix.py --write <file>, scripts/validate.py
    <file>, and scripts/score_corpus.py --min-score 90 <file>
+   # for semantic fallback output: scripts/score_corpus.py --min-sap-like 90 <file>
 6. Print the flow narration as a numbered markdown list
 
 Hard rules enforced by the validator: no dark page backgrounds; flow pills must
@@ -200,6 +201,8 @@ python3 plugins/sap-architecture/skills/sap-architecture/scripts/score_corpus.py
 ```
 
 `score_corpus.py` compares the candidate against all bundled SAP references and exits nonzero if the best score is below the threshold. For deeper research loops, pass cloned SAP repos with `--references /path/to/SAP/architecture-center --references /path/to/SAP/btp-solution-diagrams`.
+
+For deterministic semantic fallback diagrams, corpus similarity can be low even when the diagram is visually correct. Use `--min-sap-like 90` to gate reference-free quality signals such as white canvas, SAP palette, Helvetica, canonical pills, zones, icons, grid snap, and validator errors.
 
 ### Run an Ollama-backed corpus evaluation loop
 
@@ -383,7 +386,7 @@ When triggered, the skill runs a 6-step pipeline (documented in full in [`plugin
 2. **Scaffold from a SAP reference template — MANDATORY** — run `scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks the 71 bundled SAP templates against the request, copies the best match to the destination, and prints alternates. The single most common cause of bad diagrams is the LLM trying to write XML from scratch — `scaffold_diagram.py` removes that temptation. Use `template_browser.py` (pre-rendered thumbnail gallery of all 71) when picking visually is faster than reading filenames.
 3. **Place BTP service icons** — fuzzy-lookup each service via `extract_icon.py`, which emits an `<mxCell>` with the official inline-SVG data URI and grid-snapped geometry.
 4. **Surgical relabel** — change labels, swap services, add a few cards next to the existing ones. **Preserve canvas size, zone hierarchy, network divider, SAP logos, footer, and identity flow.** For complex scenarios that need more than relabeling, open the file in draw.io desktop and edit directly. Reference docs: `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`, `do-and-dont.md`, `manual-workflow.md`.
-5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (now catches dark page backgrounds, novelty pill verbs like PROMPT/ROUTE/CONTEXT/DELEGATE, multi-logo over-use), then `score_corpus.py --min-score 90`.
+5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (now catches dark page backgrounds, novelty pill verbs like PROMPT/ROUTE/CONTEXT/DELEGATE, multi-logo over-use), then `score_corpus.py --min-score 90` for template-derived diagrams or `score_corpus.py --min-sap-like 90` for semantic fallback diagrams.
 5b. **Visual review (the missing last 20%)** — `render_compare.py <ref>.drawio <cand>.drawio --open` builds an HTML page with side-by-side rendered PNGs, structural score breakdown, and **actionable suggestions mapped to the lowest-scoring fingerprint dimensions**. The fingerprint score is necessary but insufficient; the visual review catches what XML diffing can't.
 6. **Narrate the flow** — print a numbered list explaining what each pill means, for pasting below the embedded image in Markdown / Confluence.
 

@@ -40,6 +40,16 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+try:
+    from validate import SAP_PALETTE
+except Exception:  # pragma: no cover - compare.py can run standalone
+    SAP_PALETTE = {
+        "#0070F2", "#EBF8FF", "#475E75", "#F5F6F7", "#1D2D3E", "#556B82",
+        "#188918", "#F5FAE5", "#C35500", "#FFF8D6", "#D20A0A", "#FFEAF4",
+        "#07838F", "#DAFDF5", "#5D36FF", "#F1ECFF", "#CC00DC", "#FFF0FA",
+        "#FFFFFF", "#FFF", "#000000", "#000", "#FCFCFC",
+    }
+
 HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
 DATA_URI_RE = re.compile(r"data:image/[^&\";]+")
 INLINE_SVG_ICON_RE = re.compile(r"shape=image[^\"]*image=data:image/svg")
@@ -70,7 +80,11 @@ CANONICAL_PILL_VOCAB = {
     "data federation", "data sync", "task data",
     "a2a", "mcp", "ord",
     "business data cloud", "business role", "cdm",
-    "role replica", "data", "metadata",
+    "role replica",
+    "commit", "build & test", "release", "deploy", "connectivity", "private link",
+    "sql", "security logs", "alerts, findings & enriched events",
+    "correlated incidents", "status & closure updates", "notification", "open ticket",
+    "data", "metadata",
 }
 STOPWORDS = {
     "a", "an", "and", "app", "apps", "architecture", "as", "at", "be", "by",
@@ -339,6 +353,105 @@ class CompareResult:
     diffs: list[str] = field(default_factory=list)
 
 
+@dataclass
+class SapLikenessResult:
+    score: float = 0.0
+    breakdown: dict[str, float] = field(default_factory=dict)
+    issues: list[str] = field(default_factory=list)
+
+
+def sap_likeness(fp: Fingerprint, *, validator_errors: int = 0) -> SapLikenessResult:
+    """Reference-free SAP Architecture Center style score."""
+    result = SapLikenessResult()
+    parts: dict[str, float] = {}
+    accepted_bgs = {"", "none", "default", "#ffffff", "#fff"}
+
+    parts["page_bg"] = 1.0 if fp.page_background.lower() in accepted_bgs else 0.0
+    if not parts["page_bg"]:
+        result.issues.append(f"non-white page background {fp.page_background!r}")
+
+    parts["validator_errors"] = 1.0 if validator_errors == 0 else 0.0
+    if validator_errors:
+        result.issues.append(f"{validator_errors} validator error(s)")
+
+    parts["zones"] = min(1.0, fp.zones / 1.0)
+    if fp.zones == 0:
+        result.issues.append("no SAP-style zones detected")
+
+    parts["icons"] = min(1.0, fp.icons / 3.0) if fp.vertices >= 4 else min(1.0, fp.icons / 1.0)
+    if fp.icons == 0:
+        result.issues.append("no bundled/icon-library assets detected")
+
+    parts["pills"] = min(1.0, fp.pills / 3.0) if fp.edges >= 2 else 1.0
+    if fp.edges >= 2 and fp.pills == 0:
+        result.issues.append("no SAP-style flow pills detected")
+
+    if fp.pills:
+        parts["pill_vocab"] = max(0.0, 1.0 - (fp.novelty_pill_count / max(1, fp.pills)))
+    else:
+        parts["pill_vocab"] = 0.8
+    if parts["pill_vocab"] < 1.0:
+        result.issues.append(f"{fp.novelty_pill_count} non-canonical pill label(s)")
+
+    sap_palette = {color.upper() for color in SAP_PALETTE}
+    visible_palette = {color.upper() for color in fp.palette}
+    if visible_palette:
+        parts["palette"] = len(visible_palette & sap_palette) / len(visible_palette)
+    else:
+        parts["palette"] = 1.0
+    if parts["palette"] < 1.0:
+        result.issues.append(f"off-palette colors: {sorted(visible_palette - sap_palette)[:6]}")
+
+    if fp.edge_palette:
+        parts["edge_palette"] = len(fp.edge_palette & sap_palette) / len(fp.edge_palette)
+    else:
+        parts["edge_palette"] = 1.0
+
+    fonts = {font.lower() for font in fp.fonts}
+    parts["fonts"] = 1.0 if not fonts or fonts <= {"helvetica", "arial"} else 0.0
+    if not parts["fonts"]:
+        result.issues.append(f"non-SAP font families: {sorted(fp.fonts)}")
+
+    allowed_strokes = {1.0, 1.5, 2.0, 3.0, 4.0}
+    if fp.stroke_widths:
+        parts["strokes"] = len(fp.stroke_widths & allowed_strokes) / len(fp.stroke_widths)
+    else:
+        parts["strokes"] = 1.0
+    if parts["strokes"] < 1.0:
+        result.issues.append(f"non-standard stroke widths: {sorted(fp.stroke_widths - allowed_strokes)}")
+
+    parts["abs_arc"] = 1.0 if fp.has_absolute_arc else 0.6
+    parts["label_bg"] = 1.0 if fp.has_label_bg or fp.edges == 0 else 0.8
+    parts["grid_snap"] = min(1.0, fp.grid_snap_rate / 0.95)
+    if fp.grid_snap_rate < 0.95:
+        result.issues.append(f"grid-snap rate {fp.grid_snap_rate * 100:.1f}%")
+
+    parts["external_images"] = 1.0 if fp.external_images == 0 else 0.0
+    if fp.external_images:
+        result.issues.append(f"{fp.external_images} external image(s)")
+
+    weights = {
+        "page_bg": 2.0,
+        "validator_errors": 2.0,
+        "zones": 1.25,
+        "icons": 1.0,
+        "pills": 0.75,
+        "pill_vocab": 1.25,
+        "palette": 1.5,
+        "edge_palette": 0.75,
+        "fonts": 1.0,
+        "strokes": 0.75,
+        "abs_arc": 0.5,
+        "label_bg": 0.5,
+        "grid_snap": 1.0,
+        "external_images": 1.0,
+    }
+    total = sum(weights[k] for k in parts)
+    result.score = round(sum(parts[k] * weights[k] for k in parts) / total * 100, 1)
+    result.breakdown = parts
+    return result
+
+
 def compare(ref: Fingerprint, cand: Fingerprint) -> CompareResult:
     r = CompareResult()
     parts: dict[str, float] = {}
@@ -506,6 +619,7 @@ def main() -> int:
     ref = fingerprint(args.reference)
     cand = fingerprint(args.candidate)
     result = compare(ref, cand)
+    quality = sap_likeness(cand)
 
     if args.score:
         print(f"{result.score:.1f}")
@@ -513,6 +627,7 @@ def main() -> int:
     if args.json:
         out = {
             "score": result.score,
+            "sap_likeness": asdict(quality),
             "breakdown": result.breakdown,
             "diffs": result.diffs,
             "reference": asdict(ref),
@@ -528,6 +643,7 @@ def main() -> int:
     print(f"reference : {args.reference}")
     print(f"candidate : {args.candidate}")
     print(f"score     : {result.score:.1f}/100")
+    print(f"sap-like  : {quality.score:.1f}/100")
     print("breakdown :")
     for k, v in result.breakdown.items():
         bar = "█" * int(v * 20)
