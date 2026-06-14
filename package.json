@@ -22,8 +22,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test test/node/cli.test.js test/node/js-tools.test.js test/node/mcp.test.js && node scripts/run-python-tests.mjs",
-    "test:node": "node --test test/node/cli.test.js test/node/js-tools.test.js test/node/mcp.test.js",
+    "test": "node --test test/node/*.test.js && node scripts/run-python-tests.mjs",
+    "test:node": "node --test test/node/*.test.js",
     "test:python": "node scripts/run-python-tests.mjs",
     "doctor": "node bin/btp-drawio.js doctor",
     "mcpb:stage": "node scripts/stage-mcpb.mjs",

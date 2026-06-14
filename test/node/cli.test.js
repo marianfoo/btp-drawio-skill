@@ -4,9 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fileURLToPath } from "node:url";
 
-const cli = fileURLToPath(new URL("../../bin/btp-drawio.js", import.meta.url));
+const cli = new URL("../../bin/btp-drawio.js", import.meta.url).pathname;
 
 function run(args) {
   return execFileSync("node", [cli, ...args], {
