@@ -5,7 +5,6 @@ import { basename, dirname, join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { decodeHTML } from "entities";
 import { resolvedPythonCommand } from "../../lib/python-tools.js";
 import { pyRound, snap10 } from "../../src/core/round.js";
 import { parseCompareStyle, parseValidateStyle } from "../../src/core/styles.js";
@@ -70,15 +69,26 @@ function firstLabeledElementId(xml) {
   throw new Error("fixture has no labeled element with an id");
 }
 
+function decodeXmlMarkupEntities(text) {
+  return String(text)
+    .replace(/&lt;|&#0*60;|&#x0*3c;/gi, "<")
+    .replace(/&gt;|&#0*62;|&#x0*3e;/gi, ">")
+    .replace(/&quot;|&#0*34;|&#x0*22;/gi, '"')
+    .replace(/&apos;|&#0*39;|&#x0*27;/gi, "'");
+}
+
 function normalizeXmlFragmentOutput(xml) {
   const text = String(xml).trim();
   if (text.startsWith("<")) return text;
-  const decoded = decodeHTML(text).trim();
+  const decoded = decodeXmlMarkupEntities(text).trim();
   return decoded.startsWith("<") ? decoded : text;
 }
 
 function canonicalizeXmlIgnoringEmbeddedSvgData(xml) {
-  return canonicalizeXml(normalizeXmlFragmentOutput(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__"));
+  const masked = normalizeXmlFragmentOutput(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__");
+  const canonical = canonicalizeXml(masked);
+  const decodedCanonical = normalizeXmlFragmentOutput(canonical);
+  return decodedCanonical === canonical ? canonical : canonicalizeXml(decodedCanonical);
 }
 
 function embeddedSvgDataCount(xml) {
