@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { checkPython, missingPythonMessage, packageRoot, runPython, toArgs } from "../lib/python-tools.js";
+import { runJsCommand, shouldUseJsEngine } from "../src/cli.js";
 
 const diagramPath = z.string().min(1).describe("Local .drawio path");
 const assetKind = z
@@ -42,6 +43,13 @@ function errorResult(text) {
 async function runTool(script, args, timeoutMs = 120_000) {
   const result = await runPython(script, args, { timeoutMs });
   return textResult(result);
+}
+
+async function runEngineTool(command, script, args, timeoutMs = 120_000) {
+  if (shouldUseJsEngine(command)) {
+    return textResult(await runJsCommand(command, args));
+  }
+  return runTool(script, args, timeoutMs);
 }
 
 async function withRelabelMapping({ mapping, mappingJson }, callback) {
@@ -121,7 +129,8 @@ export async function main() {
       }
     },
     async ({ request, out, template, diagramName, dryRun, json }) =>
-      runTool(
+      runEngineTool(
+        "scaffold",
         "scaffold_diagram.py",
         toArgs([
           request,
@@ -268,9 +277,26 @@ export async function main() {
       }
     },
     async ({ file, mapping, mappingJson, out, write }) =>
-      withRelabelMapping({ mapping, mappingJson }, (mappingPath) =>
-        runTool("relabel.py", toArgs([file, mappingPath, out ? "--out" : undefined, out, write ? "--write" : undefined]))
-      )
+      shouldUseJsEngine("relabel")
+        ? textResult(
+            await runJsCommand(
+              "relabel",
+              toArgs([
+                file,
+                mapping && !mapping.trim().startsWith("{") ? mapping : undefined,
+                mapping?.trim().startsWith("{") ? "--mapping-json" : undefined,
+                mapping?.trim().startsWith("{") ? mapping : undefined,
+                mappingJson ? "--mapping-json" : undefined,
+                mappingJson,
+                out ? "--out" : undefined,
+                out,
+                write ? "--write" : undefined
+              ])
+            )
+          )
+        : withRelabelMapping({ mapping, mappingJson }, (mappingPath) =>
+            runTool("relabel.py", toArgs([file, mappingPath, out ? "--out" : undefined, out, write ? "--write" : undefined]))
+          )
   );
 
   server.registerTool(
@@ -289,7 +315,8 @@ export async function main() {
       }
     },
     async ({ query, id, x, y, w, h, parent, label }) =>
-      runTool(
+      runEngineTool(
+        "extract-icon",
         "extract_icon.py",
         toArgs([
           query,
@@ -329,7 +356,8 @@ export async function main() {
       }
     },
     async ({ query, list, kind, id, x, y, w, h, parent, label }) =>
-      runTool(
+      runEngineTool(
+        "extract-asset",
         "extract_asset.py",
         toArgs([
           query,

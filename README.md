@@ -158,6 +158,8 @@ MCP clients can call `btp_drawio_relabel` with either a JSON mapping file path o
 
 The MCP server also exposes `btp_drawio_autofix` for deterministic mechanical cleanup and `btp_drawio_extract_asset` for generic SAP starter-kit assets such as `on-premise-sap`. Use `btp_drawio_doctor` first when Python or draw.io rendering is not configured; it reports the resolved package root, Python runtime, and `DRAWIO_CLI` setting.
 
+Pure-JS migration is incremental. These commands already run through the JS engine by default and can be forced with `BTP_DRAWIO_ENGINE=js`: `select`, `scaffold`, `extract-icon`, `extract-asset`, and `relabel`. Other commands still use the Python engine until their parity gates are complete. Use `BTP_DRAWIO_ENGINE=python` as an escape hatch during the transition.
+
 ### Updating the plugin
 
 ```

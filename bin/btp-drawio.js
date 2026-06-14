@@ -2,6 +2,7 @@
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { checkPython, missingPythonMessage, packageRoot, runPythonInherit, scriptPath } from "../lib/python-tools.js";
+import { JS_COMMANDS, runJsCommand, shouldUseJsEngine } from "../src/cli.js";
 
 const COMMANDS = new Map([
   ["scaffold", "scaffold_diagram.py"],
@@ -112,6 +113,17 @@ if (!script) {
   console.error(`unknown command: ${command}\n`);
   usage();
   process.exit(2);
+}
+
+if (shouldUseJsEngine(command)) {
+  if (!JS_COMMANDS.has(command)) {
+    console.error(`command ${command} is not available in the JS engine yet; use BTP_DRAWIO_ENGINE=python`);
+    process.exit(2);
+  }
+  const result = await runJsCommand(command, args);
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  process.exit(result.code);
 }
 
 process.exit(runPythonInherit(script, args));

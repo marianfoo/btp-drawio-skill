@@ -13,6 +13,7 @@
     "lib/",
     "mcpb/",
     "scripts/*.mjs",
+    "src/",
     "plugins/",
     "!plugins/**/.cache/**",
     "!plugins/**/__pycache__/**",
@@ -47,6 +48,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@xmldom/xmldom": "^0.9.10",
+    "entities": "^6.0.1",
     "zod": "^4.4.3"
   }
 }
