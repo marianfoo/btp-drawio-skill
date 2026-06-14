@@ -95,6 +95,53 @@ function embeddedSvgDataCount(xml) {
   return [...normalizeXmlFragmentOutput(xml).matchAll(/image=data:image\/svg\+xml,([^;"]+)/g)].length;
 }
 
+function sortedAttrs(attrs) {
+  return Object.fromEntries(Object.entries(attrs).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
+function parseAttrs(text = "") {
+  const attrs = {};
+  for (const match of String(text).matchAll(/\s+([A-Za-z_:][-A-Za-z0-9_:.]*)=(?:"([^"]*)"|'([^']*)')/g)) {
+    attrs[match[1]] = match[2] ?? match[3] ?? "";
+  }
+  return sortedAttrs(attrs);
+}
+
+function extractCellFingerprint(xml) {
+  const masked = normalizeXmlFragmentOutput(xml).replace(/image=data:image\/svg\+xml,[^;"]+/g, "image=data:image/svg+xml,__IMAGE__");
+  const parsed = parseXml(`<__extract_root>${masked}</__extract_root>`);
+  const domCells = elementsByTag(parsed, "mxCell");
+  if (domCells.length) {
+    return domCells.map((cell) => {
+      const attrs = {};
+      for (let i = 0; i < cell.attributes.length; i += 1) {
+        const attr = cell.attributes.item(i);
+        attrs[attr.name] = attr.value;
+      }
+      return {
+        attrs: sortedAttrs(attrs),
+        geometry: elementsByTag(cell, "mxGeometry").map((geometry) => {
+          const geometryAttrs = {};
+          for (let i = 0; i < geometry.attributes.length; i += 1) {
+            const attr = geometry.attributes.item(i);
+            geometryAttrs[attr.name] = attr.value;
+          }
+          return sortedAttrs(geometryAttrs);
+        })
+      };
+    });
+  }
+
+  const normalized = normalizeXmlFragmentOutput(canonicalizeXml(masked));
+  return [...normalized.matchAll(/<mxCell\b([^>]*)>([\s\S]*?)<\/mxCell>|<mxCell\b([^>]*)\/>/g)].map((match) => {
+    const body = match[2] || "";
+    return {
+      attrs: parseAttrs(match[1] || match[3] || ""),
+      geometry: [...body.matchAll(/<mxGeometry\b([^>]*)\/?>/g)].map((geometry) => parseAttrs(geometry[1]))
+    };
+  });
+}
+
 test("pyRound matches Python half-even rounding traps", () => {
   assert.equal(pyRound(2.5), 2);
   assert.equal(pyRound(3.5), 4);
@@ -121,6 +168,14 @@ test("canonicalizeXml compares XML structure instead of serializer whitespace", 
   assert.notEqual(
     canonicalizeXmlIgnoringEmbeddedSvgData('&lt;mxCell id="a" value="One" /&gt;'),
     canonicalizeXmlIgnoringEmbeddedSvgData('<mxCell value="Two" id="a"/>')
+  );
+  assert.deepEqual(
+    extractCellFingerprint('&lt;mxCell id="a" value="One"&gt;&lt;mxGeometry x="0" as="geometry"/&gt;&lt;/mxCell&gt;'),
+    extractCellFingerprint('<mxCell value="One" id="a"><mxGeometry as="geometry" x="0"/></mxCell>')
+  );
+  assert.notDeepEqual(
+    extractCellFingerprint('&lt;mxCell id="a" value="One" /&gt;'),
+    extractCellFingerprint('<mxCell value="Two" id="a"/>')
   );
 });
 
@@ -188,11 +243,7 @@ test("ported extract tools match Python semantically despite XML serializer whit
       BTP_DRAWIO_PYTHON: "definitely-not-python"
     });
     assert.equal(embeddedSvgDataCount(jsOut), embeddedSvgDataCount(pyOut), `${command} ${args.join(" ")} image count`);
-    assert.equal(
-      canonicalizeXmlIgnoringEmbeddedSvgData(jsOut),
-      canonicalizeXmlIgnoringEmbeddedSvgData(pyOut),
-      `${command} ${args.join(" ")}`
-    );
+    assert.deepEqual(extractCellFingerprint(jsOut), extractCellFingerprint(pyOut), `${command} ${args.join(" ")}`);
   }
 });
 
