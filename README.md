@@ -21,9 +21,9 @@ Under the hood it bundles **100 SAP BTP service icons, 71 reference templates, 4
 
 ## Install
 
-**Recommendation: install it as a skill — that's all you need.** It works the same way in both Claude apps: install once, then describe the diagram in plain English and Claude auto-loads the skill. You do **not** need to build an `.mcpb` bundle or publish to npm — those are optional extras for non-Claude tools, documented in [internals](docs/internals.md#npx-mcp-and-mcpb-non-claude-tools).
+**Recommendation: install it as a skill — that's all you need.** It works the same way everywhere Claude Code runs — terminal, IDE extension, or the Claude desktop/web apps: install once, then describe the diagram in plain English and Claude auto-loads the skill. You do **not** need to build an `.mcpb` bundle or publish to npm — those are optional extras for non-Claude tools, documented in [internals](docs/internals.md#npx-mcp-and-mcpb-non-claude-tools).
 
-### Claude Code
+### Claude Code (CLI)
 
 ```
 /plugin marketplace add marianfoo/btp-drawio-skill
@@ -37,6 +37,20 @@ Update or remove later:
 /plugin uninstall sap-architecture
 /plugin marketplace remove btp-drawio-skill
 ```
+
+### VS Code, Cursor & JetBrains (Claude Code extension)
+
+The official **Claude Code IDE extension** brings the same plugin system into your editor, so the skill behaves exactly like it does in the terminal.
+
+1. **Install the extension** for your IDE:
+   - **VS Code** (1.98+) — search "Claude Code" in the Extensions view, or use the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code). Setup guide: [Use Claude Code in VS Code](https://code.claude.com/docs/en/vs-code).
+   - **Cursor / Windsurf / other VS Code forks** — install the same extension from the [Open VSX registry](https://open-vsx.org/extension/Anthropic/claude-code).
+   - **JetBrains IDEs** (IntelliJ, WebStorm, PyCharm, …) — install the [Claude Code plugin](https://code.claude.com/docs/en/jetbrains) from the JetBrains Marketplace.
+2. **Install the plugin from the Claude panel** — type `/plugins` for the graphical installer, or run the same `/plugin marketplace add marianfoo/btp-drawio-skill` then `/plugin install sap-architecture` as above. Plugins and marketplaces are [shared between the extension and CLI](https://code.claude.com/docs/en/vs-code#manage-plugins), so you set this up once.
+
+Then describe your diagram in the Claude panel, exactly as in the terminal.
+
+> **Prefer Cursor's built-in Agent** over the Claude Code extension? This repo also ships a native **Cursor rule**: clone the repo and copy [`cursor-rules/sap-architecture.mdc`](plugins/sap-architecture/cursor-rules/sap-architecture.mdc) into your project's `.cursor/rules/` folder (edit the skill path inside it first). See [Cursor → Rules](https://cursor.com/docs/rules).
 
 ### Claude Desktop / Claude.ai
 
