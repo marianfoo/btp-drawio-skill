@@ -38,19 +38,40 @@ Update or remove later:
 /plugin marketplace remove btp-drawio-skill
 ```
 
-### VS Code, Cursor & JetBrains (Claude Code extension)
+### Other AI coding tools (VS Code Copilot, OpenAI Codex, Cursor, …)
 
-The official **Claude Code IDE extension** brings the same plugin system into your editor, so the skill behaves exactly like it does in the terminal.
+You don't need Claude for this. The skill is **portable** — plain Markdown (`SKILL.md`) plus dependency-free Python scripts — so any agent that can read a project instructions file and run shell commands can drive it. Wire it in once, then ask for a diagram.
 
-1. **Install the extension** for your IDE:
-   - **VS Code** (1.98+) — search "Claude Code" in the Extensions view, or use the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code). Setup guide: [Use Claude Code in VS Code](https://code.claude.com/docs/en/vs-code).
-   - **Cursor / Windsurf / other VS Code forks** — install the same extension from the [Open VSX registry](https://open-vsx.org/extension/Anthropic/claude-code).
-   - **JetBrains IDEs** (IntelliJ, WebStorm, PyCharm, …) — install the [Claude Code plugin](https://code.claude.com/docs/en/jetbrains) from the JetBrains Marketplace.
-2. **Install the plugin from the Claude panel** — type `/plugins` for the graphical installer, or run the same `/plugin marketplace add marianfoo/btp-drawio-skill` then `/plugin install sap-architecture` as above. Plugins and marketplaces are [shared between the extension and CLI](https://code.claude.com/docs/en/vs-code#manage-plugins), so you set this up once.
+**First, get the skill files** where your agent can reach them:
 
-Then describe your diagram in the Claude panel, exactly as in the terminal.
+```bash
+git clone https://github.com/marianfoo/btp-drawio-skill.git
+```
 
-> **Prefer Cursor's built-in Agent** over the Claude Code extension? This repo also ships a native **Cursor rule**: clone the repo and copy [`cursor-rules/sap-architecture.mdc`](plugins/sap-architecture/cursor-rules/sap-architecture.mdc) into your project's `.cursor/rules/` folder (edit the skill path inside it first). See [Cursor → Rules](https://cursor.com/docs/rules).
+**Then point your tool's instruction file at the skill:**
+
+| Tool | Add / use this file | Official docs |
+|---|---|---|
+| **OpenAI Codex** (CLI & IDE) | `AGENTS.md` in your repo root | [AGENTS.md](https://agents.md/) · [Codex guide](https://developers.openai.com/codex/guides/agents-md) |
+| **GitHub Copilot** (VS Code, agent mode) | `.github/copilot-instructions.md` | [VS Code custom instructions](https://code.visualstudio.com/docs/agent-customization/custom-instructions) |
+| **Cursor** | bundled [`cursor-rules/sap-architecture.mdc`](plugins/sap-architecture/cursor-rules/sap-architecture.mdc) → `.cursor/rules/` | [Cursor Rules](https://cursor.com/docs/rules) |
+| **Gemini CLI · Jules · Amp · Factory** | `AGENTS.md` (same open standard) | [AGENTS.md](https://agents.md/) |
+| **Windsurf · Cline · Continue · Aider** | that tool's rules / context file → point it at the skill folder | their own docs |
+| **Anything else** | paste the skill's instructions into the system prompt | [ready-made prompt](docs/internals.md#use-outside-of-claude-other-agent-skills-runtimes) |
+
+**And tell the agent to use it** — put something like this in that file (full version in [internals](docs/internals.md#use-outside-of-claude-other-agent-skills-runtimes)):
+
+```markdown
+For any SAP / BTP / on-prem architecture diagram, use the sap-architecture skill at
+<path>/plugins/sap-architecture/skills/sap-architecture/. Follow its SKILL.md 6-step
+workflow and run its scripts (Python 3.8+, no third-party deps): scaffold_diagram.py →
+extract_icon.py → relabel.py → autofix.py → validate.py → score_corpus.py --min-score 90.
+Never write .drawio XML from scratch — always scaffold from a SAP template first.
+```
+
+> **Two caveats:** unlike Claude, these tools won't *auto-load* the skill — the instruction file wires it in per project; and the agent needs shell access plus **Python 3.8+** to run the scripts. Use a strong model (see [Recommended models](#recommended-models)) — e.g. Codex with GPT-5.5; small models skip the scaffold/validate discipline.
+
+> Want the skill in VS Code or JetBrains *with Claude* instead? The official [Claude Code extension](https://code.claude.com/docs/en/vs-code) runs it just like the CLI — install the extension, then `/plugins`.
 
 ### Claude Desktop / Claude.ai
 

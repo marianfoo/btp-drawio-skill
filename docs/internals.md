@@ -264,14 +264,17 @@ Pure-JS migration is incremental. These commands already run through the JS engi
 
 ## Use outside of Claude (other Agent-Skills runtimes)
 
-The skill is a plain [Agent Skills](https://agentskills.io)-compliant bundle — the `SKILL.md` frontmatter sticks to the portable subset (`name`, `description`) and doesn't depend on any Claude Code-specific feature. Anything that loads an `SKILL.md` tree should work:
+The skill is a plain [Agent Skills](https://agentskills.io)-compliant bundle — dependency-free Python scripts plus a portable `SKILL.md` — so it isn't tied to Claude. Most coding agents accept a project **instructions file** (the open [AGENTS.md](https://agents.md/) standard, or a tool-specific file); point it at this skill and let the agent run the scripts:
 
-- **Cursor** — easiest is the [Claude Code extension](../README.md#install) (it installs in Cursor via Open VSX). To use Cursor's own Agent instead, this repo ships a ready-made rule: copy [`cursor-rules/sap-architecture.mdc`](../plugins/sap-architecture/cursor-rules/sap-architecture.mdc) into your project's `.cursor/rules/` folder and edit the skill path inside it. See [Cursor → Rules](https://cursor.com/docs/rules).
-- **Windsurf / Continue / other rules-based editors** — point their rules-directory setting at `plugins/sap-architecture/skills/sap-architecture/`.
-- **Self-hosted MCP clients / Open Interpreter / any Agent-Skills runtime** — drop the folder into the skills directory your client expects (check your client's docs for the path; `~/.agents/skills/` and `~/.config/<client>/skills/` are common).
+- **OpenAI Codex** (CLI & IDE) — add an [`AGENTS.md`](https://developers.openai.com/codex/guides/agents-md) at the repo root. Codex reads it automatically at session start.
+- **GitHub Copilot** (VS Code, agent mode) — add [`.github/copilot-instructions.md`](https://code.visualstudio.com/docs/agent-customization/custom-instructions); VS Code applies it to every chat request in the workspace. Copilot also honors `AGENTS.md`.
+- **Cursor** — copy the bundled [`cursor-rules/sap-architecture.mdc`](../plugins/sap-architecture/cursor-rules/sap-architecture.mdc) into `.cursor/rules/`, then edit the skill path inside it. See [Cursor → Rules](https://cursor.com/docs/rules).
+- **Gemini CLI, Jules, Amp, Factory, and other AGENTS.md-aware agents** — add an `AGENTS.md` (same standard).
+- **Windsurf / Cline / Continue / Aider** — point the tool's rules / context setting at `plugins/sap-architecture/skills/sap-architecture/`.
+- **Self-hosted MCP clients / Open Interpreter / any Agent-Skills runtime** — drop the folder into the skills directory your client expects (`~/.agents/skills/` and `~/.config/<client>/skills/` are common).
 - **Raw prompt** — concatenate `SKILL.md` + the `references/*.md` you need into the system prompt.
 
-If your host doesn't load skill files, paste this minimal prompt:
+Whatever the tool: the agent needs shell access and **Python 3.8+** to run the scripts, and works best with a strong model (see [Recommended models](../README.md#recommended-models)). Paste this ready-made instruction block (it's also the fallback when your host can't read files):
 
 ```
 You have access to the SAP Architecture Skill. When the user asks for an SAP /
