@@ -65,7 +65,8 @@ git clone https://github.com/marianfoo/btp-drawio-skill.git
 For any SAP / BTP / on-prem architecture diagram, use the sap-architecture skill at
 <path>/plugins/sap-architecture/skills/sap-architecture/. Follow its SKILL.md 6-step
 workflow and run its scripts (Python 3.8+, no third-party deps): scaffold_diagram.py →
-extract_icon.py → relabel.py → autofix.py → validate.py → score_corpus.py --min-score 90.
+extract_icon.py → relabel.py → autofix.py → validate.py → score_corpus.py --min-score 90,
+then iterate.py to render, re-score, and fix the worst issue until it matches the SAP reference.
 Never write .drawio XML from scratch — always scaffold from a SAP template first.
 ```
 
@@ -148,6 +149,20 @@ For sharper results, see [Write better prompts](#write-better-prompts).
 - **SAP / BTP / on-prem diagrams only.** It's tuned to the SAP Horizon style and a 71-template corpus, not a general-purpose diagram generator.
 - **`npx btp-drawio-skill` is not the skill** and isn't published to npm yet — it's the raw CLI/MCP wrapper for non-Claude tools. Skip it for Claude.
 
+### Nudge it to a good diagram
+
+**Expect the first draft to be ~80% there, then nudge it.** The skill ships a feedback loop that closes the gap — when you ask Claude to keep improving, it renders the diagram to an image, scores it against the SAP corpus, *looks at the picture*, fixes one thing, and re-checks. So you can review the result and reply in plain English; you don't need to touch XML.
+
+Give **specific, visual** feedback. Vague ("make it better") gives weak results; concrete observations map directly to fixes:
+
+- "The icons are too large and overlap the card text — shrink them to SAP's 32×32." 
+- "Two arrows cross straight through the BTP box — re-route them around it."
+- "Joule should be its own purple zone next to BTP, not nested inside it."
+- "The title band and SAP footer are missing — add them back from the template."
+- "Use the canonical SAP flow pills (TRUST, Authenticate, OAuth, OData/REST), not invented labels."
+
+Under the hood the agent runs `iterate.py` (render + score + the worst-first fix list) and `render_compare.py` (a side-by-side / overlay / swipe / difference HTML review you can open in a browser). You don't run these yourself — just describe what looks off and let it loop until the diagram matches the SAP reference. See [internals](docs/internals.md) for the loop details.
+
 ---
 
 ## Write better prompts
@@ -206,7 +221,7 @@ Full palette/style rules and the scoring methodology live in [internals](docs/in
 
 ## How it works
 
-The skill is an **authoring assistant**, not a one-shot generator. When triggered it runs a short pipeline: parse your description into a plan → scaffold from the closest SAP reference template (never write XML from scratch) → place official service icons → make surgical label edits → run autofix + validate + score → narrate the flow. The scaffold-then-validate discipline is what keeps the output on-style.
+The skill is an **authoring assistant**, not a one-shot generator. When triggered it runs a short pipeline: parse your description into a plan → scaffold from the closest SAP reference template (never write XML from scratch) → place official service icons → make surgical label edits → run autofix + validate + score → narrate the flow. The scaffold-then-validate discipline is what keeps the output on-style. From there it can **iterate**: render the diagram to an image, compare it to the SAP reference, and fix the worst issue first — repeat until it matches (see [Nudge it to a good diagram](#nudge-it-to-a-good-diagram)).
 
 See the full 6-step pipeline, the design-rule table, and the validator internals in **[docs/internals.md](docs/internals.md)**.
 
