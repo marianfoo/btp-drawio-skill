@@ -15,9 +15,10 @@ Bundles:
 
 ## Table of contents
 
+- [Install and use](#install-and-use)
 - [Quick start — Claude Code users](#quick-start--claude-code-users)
 - [Prompting for good diagrams](#prompting-for-good-diagrams)
-- [Use with npx, MCP, and MCPB](#use-with-npx-mcp-and-mcpb)
+- [Optional: npx, MCP, and MCPB (advanced)](#optional-npx-mcp-and-mcpb-advanced)
 - [Install in Claude Desktop / Claude.ai](#install-in-claude-desktop--claudeai)
 - [Use outside of Claude (other Agent-Skills runtimes)](#use-outside-of-claude-other-agent-skills-runtimes)
 - [Use the scripts directly (no LLM)](#use-the-scripts-directly-no-llm)
@@ -27,6 +28,51 @@ Bundles:
 - [Development](#development)
 - [License & attribution](#license--attribution)
 - [Credits & research sources](#credits--research-sources)
+
+---
+
+## Install and use
+
+**Recommendation: install it as a skill — that's all you need.** It works the same way in both Claude apps: install once, then describe the diagram in plain English and Claude auto-loads the skill. You do **not** need to build the `.mcpb` bundle or publish to npm; those are optional extras for non-Claude tools (see [Optional: npx, MCP, and MCPB](#optional-npx-mcp-and-mcpb-advanced)).
+
+**Claude Code:**
+
+```
+/plugin marketplace add marianfoo/btp-drawio-skill
+/plugin install sap-architecture
+```
+
+**Claude Desktop / Claude.ai** — drop the skill folder into your skills directory:
+
+```bash
+git clone https://github.com/marianfoo/btp-drawio-skill.git
+mkdir -p ~/.claude/skills
+cp -R btp-drawio-skill/plugins/sap-architecture/skills/sap-architecture ~/.claude/skills/
+```
+
+Restart Claude; the skill appears in the Skills panel. (Windows steps and the why: [Install in Claude Desktop / Claude.ai](#install-in-claude-desktop--claudeai).)
+
+Then just ask:
+
+> Create an L2 SAP architecture diagram — a CAP app on SAP BTP with XSUAA, HANA Cloud, and Destination Service reaching on-prem S/4HANA through SAP Cloud Connector.
+
+Claude picks the closest SAP template, drops the right icons, runs autofix + validate + score, and hands back an editable `.drawio` plus a numbered flow narration. More examples and prompt-writing tips: [Prompting for good diagrams](#prompting-for-good-diagrams).
+
+### What you need
+
+- **Claude Code or Claude Desktop / Claude.ai** — any recent version with skills support.
+- **Python 3.8+ on your PATH** — the diagram engine (template selection, icon extraction, `autofix.py`, `validate.py`, scoring) is plain Python with zero third-party dependencies. Check with `python3 --version`.
+- **draw.io to open the result** — the [desktop app](https://www.drawio.com/) or [app.diagrams.net](https://app.diagrams.net). Only needed to view/edit; the skill writes the `.drawio` without it.
+- **Optional: the draw.io desktop CLI** — only if you want the skill to export PNG/SVG/PDF for you. Without it you still get the editable `.drawio` and export by hand.
+- **No API keys, no `npm install`, no MCP server, no cloud calls** — every icon, template, and script is bundled and runs locally.
+
+### What it can't do (limits)
+
+- **It's an authoring assistant, not a one-shot generator.** Budget ~15–30 min per diagram: roughly ⅓ of prompts pass the quality gate clean, the rest need a few surgical edits in draw.io desktop. Full loop: [What the skill does — workflow](#what-the-skill-does--workflow).
+- **No Python → no quality gates.** Claude can still draft a diagram, but `validate.py` / `score_corpus.py` won't run, so you lose the off-palette / bent-arrow / clipped-label checks.
+- **PNG/SVG/PDF export needs the draw.io CLI.** No CLI → export manually from draw.io.
+- **SAP / BTP / on-prem diagrams only.** It's tuned to the SAP Horizon style and a 71-template corpus, not a general-purpose diagram generator.
+- **`npx btp-drawio-skill` is not the skill** and isn't published to npm yet — it's the raw CLI/MCP wrapper for non-Claude tools. Skip it for Claude.
 
 ---
 
@@ -92,9 +138,11 @@ Weak prompt:
 
 > Draw ARC-1 with BTP and S/4HANA.
 
-## Use with npx, MCP, and MCPB
+## Optional: npx, MCP, and MCPB (advanced)
 
-This repo now ships a Node entry point for easier local use and packaging. The Node layer wraps the stable Python diagram engine, so **Python 3.8+ is still required** for the current implementation.
+> **You do not need any of this for Claude Code or Claude Desktop** — [installing the skill](#install-and-use) is the whole story. This section only matters if you want to drive the engine from a non-Claude MCP client (Cursor, Windsurf, …), call it from the command line, or build a one-click installer.
+
+This repo also ships a Node entry point for easier local use and packaging. The Node layer wraps the stable Python diagram engine, so **Python 3.8+ is still required** for the current implementation.
 
 From npm once published:
 
@@ -176,6 +224,8 @@ Pure-JS migration is incremental. These commands already run through the JS engi
 ---
 
 ## Install in Claude Desktop / Claude.ai
+
+> The macOS/Linux quick version is in [Install and use](#install-and-use) above. This section adds the Windows steps and the background.
 
 Claude Desktop and Claude.ai load skills from the user's skills folder. Since this repo follows the [Agent Skills open standard](https://agentskills.io), you can drop the `SKILL.md` tree directly into the host's skills directory:
 
