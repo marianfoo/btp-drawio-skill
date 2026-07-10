@@ -143,8 +143,8 @@ def extract_semantics(path: Path) -> DiagramSemantics:
     for edge in scope.iter("mxCell"):
         if edge.get("edge") != "1":
             continue
-        source_id = edge.get("source") or ""
-        target_id = edge.get("target") or ""
+        source_id = edge.get("data-semantic-source") or edge.get("source") or ""
+        target_id = edge.get("data-semantic-target") or edge.get("target") or ""
         edge_label = clean_label(edge.get("value") or "")
         edges.append((source_id, target_id, endpoint_label(source_id), endpoint_label(target_id), edge_label))
 

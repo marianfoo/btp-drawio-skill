@@ -15,6 +15,7 @@ function snap(value) {
 }
 
 export function fixGeometry(text, stats) {
+  if (/<mxGraphModel\b[^>]*\bgrid="0"/.test(text)) return text;
   return text.replace(/\b(x|y|width|height)="(-?\d+(?:\.\d+)?)"/g, (_match, attr, rawNumber) => {
     const num = Number(rawNumber);
     const snapped = snap(num);

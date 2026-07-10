@@ -109,7 +109,52 @@ def source_specific_element(elem: ET.Element) -> bool:
     )
 
 
+def drawing_layer_id(model_root: ET.Element) -> str:
+    root_cell = next(
+        (cell for cell in model_root.findall("mxCell") if not cell.get("parent") and cell.get("id")),
+        None,
+    )
+    if root_cell is not None:
+        layer = next(
+            (
+                cell for cell in model_root.findall("mxCell")
+                if cell.get("parent") == root_cell.get("id") and cell.get("id")
+            ),
+            None,
+        )
+        if layer is not None:
+            return layer.get("id") or "1"
+    return "1"
+
+
+def top_level_bounds(model_root: ET.Element, layer_id: str) -> tuple[float, float, float, float] | None:
+    boxes: list[tuple[float, float, float, float]] = []
+    for cell in model_root.iter("mxCell"):
+        if cell.get("parent") != layer_id or cell.get("vertex") != "1":
+            continue
+        geometry = cell.find("mxGeometry")
+        if geometry is None:
+            continue
+        try:
+            x = float(geometry.get("x") or 0)
+            y = float(geometry.get("y") or 0)
+            width = float(geometry.get("width") or 0)
+            height = float(geometry.get("height") or 0)
+        except ValueError:
+            continue
+        boxes.append((x, y, x + width, y + height))
+    if not boxes:
+        return None
+    return (
+        min(box[0] for box in boxes),
+        min(box[1] for box in boxes),
+        max(box[2] for box in boxes),
+        max(box[3] for box in boxes),
+    )
+
+
 def sanitize_tree(root: ET.Element, *, source_template: str, source_url: str) -> list[str]:
+    already_derivative = root.get("data-guarded-derivative") == "true"
     removed_ids: list[str] = []
     for elem in list(root.iter()):
         if source_specific_element(elem):
@@ -151,8 +196,19 @@ def sanitize_tree(root: ET.Element, *, source_template: str, source_url: str) ->
         page_height = float(graph.get("pageHeight") or 827)
     except ValueError as exc:
         raise ValueError("invalid page dimensions") from exc
-    new_height = page_height + 40
+    new_height = page_height if already_derivative else page_height + 40
     graph.set("pageHeight", str(int(new_height) if new_height.is_integer() else new_height))
+    layer_id = drawing_layer_id(model_root)
+    bounds = top_level_bounds(model_root, layer_id)
+    if bounds is None:
+        disclaimer_x = 20.0
+        disclaimer_y = page_height + 10
+        disclaimer_width = max(100.0, page_width - 40)
+    else:
+        min_x, _min_y, max_x, max_y = bounds
+        disclaimer_x = min_x + 20
+        disclaimer_y = max_y + 10
+        disclaimer_width = max(100.0, max_x - min_x - 40)
     disclaimer = ET.SubElement(
         model_root,
         "mxCell",
@@ -164,16 +220,16 @@ def sanitize_tree(root: ET.Element, *, source_template: str, source_url: str) ->
                 "whiteSpace=wrap;fontFamily=Helvetica;fontSize=8;fontColor=#475E75;"
             ),
             "vertex": "1",
-            "parent": "1",
+            "parent": layer_id,
         },
     )
     ET.SubElement(
         disclaimer,
         "mxGeometry",
         {
-            "x": "20",
-            "y": str(int(page_height + 10)),
-            "width": str(max(100, int(page_width - 40))),
+            "x": str(int(disclaimer_x) if disclaimer_x.is_integer() else disclaimer_x),
+            "y": str(int(disclaimer_y) if disclaimer_y.is_integer() else disclaimer_y),
+            "width": str(int(disclaimer_width) if disclaimer_width.is_integer() else disclaimer_width),
             "height": "20",
             "as": "geometry",
         },

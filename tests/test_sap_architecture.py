@@ -59,6 +59,27 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(100.0, result.score)
         self.assertEqual(1.0, result.breakdown["pill_vocab"])
 
+    def test_derivative_footer_is_excluded_from_template_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.drawio"
+            derivative = Path(tmp) / "derivative.drawio"
+            source.write_text("""<mxfile><diagram><mxGraphModel pageWidth="800" pageHeight="600">
+              <root><mxCell id="0"/><mxCell id="1" parent="0"/>
+              <mxCell id="content" value="Architecture Content" vertex="1" parent="1"
+                style="text;html=1;fontFamily=Helvetica;"><mxGeometry x="20" y="20" width="200" height="40" as="geometry"/></mxCell>
+              </root></mxGraphModel></diagram></mxfile>""", encoding="utf-8")
+            provenance.sanitize_file(
+                source,
+                derivative,
+                source_template="template.drawio",
+                source_url="https://example.invalid/template",
+            )
+            source_fp = compare.fingerprint(source)
+            derivative_fp = compare.fingerprint(derivative)
+        self.assertEqual(source_fp.canvas_h, derivative_fp.canvas_h)
+        self.assertEqual(source_fp.label_tokens, derivative_fp.label_tokens)
+        self.assertEqual(source_fp.cells_total, derivative_fp.cells_total)
+
     def test_sap_likeness_scores_semantic_output_without_template_similarity(self) -> None:
         description = (
             "Developer consumes SAP S/4HANA On-Premise from VS Code through ARC-1 "
@@ -166,8 +187,35 @@ class AutofixTests(unittest.TestCase):
         self.assertIn("strokeWidth=1", fixed)
         self.assertIn("fontFamily=Helvetica", fixed)
 
+    def test_grid_disabled_preserves_official_template_geometry(self) -> None:
+        raw = """<mxfile><diagram><mxGraphModel grid="0"><root>
+          <mxCell id="0"/><mxCell id="1" parent="0"/>
+          <mxCell id="a" vertex="1" parent="1"><mxGeometry x="13.25" y="27.5" width="101.5" height="59.25" as="geometry"/></mxCell>
+        </root></mxGraphModel></diagram></mxfile>"""
+        fixed, stats = autofix.apply_all(raw)
+        self.assertIn('x="13.25"', fixed)
+        self.assertIn('height="59.25"', fixed)
+        self.assertEqual(0, stats["geometry"])
+
 
 class SelectionTests(unittest.TestCase):
+    def test_authentication_request_ignores_exclusion_terms_when_ranking(self) -> None:
+        query = (
+            "Create an L2 SAP authentication architecture for a business user accessing an SAP BTP "
+            "application through SAP Cloud Identity Services - Identity Authentication, federated "
+            "with a corporate identity provider using SAML 2.0 or OIDC. Authentication only: "
+            "exclude Identity Provisioning, SCIM, and identity lifecycle."
+        )
+        ranked = scaffold_diagram.rank_candidates(query, 5)
+        self.assertEqual(
+            "btp_SAP_Cloud_Identity_Services_Authentication_L2.drawio",
+            Path(ranked[0].path).name,
+        )
+        self.assertNotIn(
+            "ac_RA0029_AgenticAI_root.drawio",
+            [Path(candidate.path).name for candidate in ranked[:3]],
+        )
+
     def test_external_private_link_reference_can_outrank_bundled_template(self) -> None:
         external_roots = [p for p in scaffold_diagram.EXTERNAL_REFERENCE_ROOTS if p.exists()]
         if not external_roots:
@@ -463,6 +511,18 @@ class GuardedSemanticTests(unittest.TestCase):
             report = validate_semantics.validate_semantics(drawio, spec)
         self.assertTrue(any(issue.code == "missing-flow" for issue in report.errors))
 
+    def test_semantic_endpoint_annotations_preserve_pill_based_rendering(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            drawio, spec = self.write_case(tmp)
+            text = drawio.read_text(encoding="utf-8").replace(
+                'source="app" target="dest"',
+                'source="protocol" target="protocol" data-semantic-source="app" data-semantic-target="dest"',
+            )
+            drawio.write_text(text, encoding="utf-8")
+            report = validate_semantics.validate_semantics(drawio, spec)
+        self.assertEqual([], report.errors)
+        self.assertEqual(1, len(report.matched["required_flows"]))
+
     def test_sap_looking_reference_fails_when_request_component_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             spec = Path(tmp) / "wrong.spec.json"
@@ -541,8 +601,47 @@ class ProvenanceTests(unittest.TestCase):
         allowed = provenance.audit_tree(root, allowed_raster_hashes={digest})
         self.assertEqual([], allowed.warnings)
 
+    def test_repeated_sanitization_does_not_grow_canvas(self) -> None:
+        root = ET.fromstring(self.SOURCE_DIAGRAM)
+        provenance.sanitize_tree(root, source_template="template.drawio", source_url="https://example.invalid/template")
+        first_height = root.find(".//mxGraphModel").get("pageHeight")
+        provenance.sanitize_tree(root, source_template="template.drawio", source_url="https://example.invalid/template")
+        second_height = root.find(".//mxGraphModel").get("pageHeight")
+        self.assertEqual(first_height, second_height)
+
+    def test_sanitizer_places_disclaimer_on_custom_negative_coordinate_layer(self) -> None:
+        root = ET.fromstring("""<mxfile>
+  <diagram id="test" name="test">
+    <mxGraphModel page="1" pageWidth="800" pageHeight="600">
+      <root>
+        <mxCell id="custom-root"/>
+        <mxCell id="custom-layer" parent="custom-root"/>
+        <mxCell id="content" value="Architecture" vertex="1" parent="custom-layer">
+          <mxGeometry x="-1600" y="-1200" width="760" height="560" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>""")
+        provenance.sanitize_tree(
+            root,
+            source_template="template.drawio",
+            source_url="https://example.invalid/template",
+        )
+        disclaimer = next(cell for cell in root.iter("mxCell") if cell.get("id") == "guarded-provenance")
+        geometry = disclaimer.find("mxGeometry")
+        self.assertEqual("custom-layer", disclaimer.get("parent"))
+        self.assertIsNotNone(geometry)
+        self.assertLess(float(geometry.get("x") or 0), 0)
+        self.assertLess(float(geometry.get("y") or 0), 0)
+
 
 class GuardedReviewTests(unittest.TestCase):
+    def test_grid_snap_warning_signature_ignores_dynamic_counts(self) -> None:
+        target = validate.Issue("warning", "align", "grid-snap rate 31.3% below recommended 95% (239/348 values)")
+        candidate = validate.Issue("warning", "align", "grid-snap rate 29.4% below recommended 95% (209/296 values)")
+        self.assertEqual(verify_delivery.issue_signature(target), verify_delivery.issue_signature(candidate))
+
     def test_visual_review_is_hash_bound(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             candidate = Path(tmp) / "candidate.png"

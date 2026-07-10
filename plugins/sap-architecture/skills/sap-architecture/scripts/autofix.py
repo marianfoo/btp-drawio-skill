@@ -2,7 +2,7 @@
 """Auto-fix mechanical issues in a .drawio file.
 
 Fixes (in-place, writes if --write given):
-  * Snap every x/y/width/height in <mxGeometry> to the 10-px grid (round half up)
+  * Snap x/y/width/height in <mxGeometry> to the 10-px grid when the diagram grid is enabled
   * Quantize floating-point widths (e.g. 239.9999...) to integers
   * Uppercase all hex color values in styles (outside data: URIs)
   * Add `absoluteArcSize=1` anywhere `arcSize=<n>` is set without it
@@ -33,6 +33,9 @@ def snap(v: float) -> int:
 
 
 def fix_geometry(text: str, stats: dict[str, int]) -> str:
+    if re.search(r'<mxGraphModel\b[^>]*\bgrid="0"', text):
+        return text
+
     def repl(m: re.Match[str]) -> str:
         attr, num = m.group(1), float(m.group(2))
         snapped = snap(num)

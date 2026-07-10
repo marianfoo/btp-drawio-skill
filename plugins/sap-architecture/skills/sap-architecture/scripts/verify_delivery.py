@@ -40,6 +40,10 @@ def sha256(path: Path) -> str:
 
 
 def issue_signature(issue: Any) -> tuple[str, str, str]:
+    if issue.cell and issue.category == "align" and issue.msg.startswith("edge "):
+        return (issue.category, issue.cell, "edge-routing")
+    if issue.msg.startswith("grid-snap rate "):
+        return (issue.category, "", "grid-snap-rate")
     return (issue.category, issue.msg, issue.cell or "")
 
 
