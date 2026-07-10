@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { checkPython, missingPythonMessage, packageRoot, runPythonInherit, scriptPath } from "../lib/python-tools.js";
 import { JS_COMMANDS, runJsCommand, shouldUseJsEngine } from "../src/cli.js";
 
@@ -98,7 +99,10 @@ function printDoctor() {
   }
 
   const macDrawio = "/Applications/draw.io.app/Contents/MacOS/draw.io";
-  const drawioCommand = process.env.DRAWIO_CLI || (existsSync(macDrawio) ? macDrawio : "drawio");
+  const localDrawio = join(packageRoot, ".cache", "drawio-runtime", "draw.io.app", "Contents", "MacOS", "draw.io");
+  const drawioCommand = process.env.DRAWIO_CLI
+    || (existsSync(macDrawio) ? macDrawio : undefined)
+    || (existsSync(localDrawio) ? localDrawio : "drawio");
   const drawioProbe = spawnSync(drawioCommand, ["--version"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"]
@@ -106,8 +110,7 @@ function printDoctor() {
   if (drawioProbe.status === 0) {
     console.log(`draw.io CLI : ${(drawioProbe.stdout || drawioProbe.stderr).trim() || "ok"}`);
   } else {
-    ok = false;
-    console.log("draw.io CLI : missing (guarded completion requires rendering; install draw.io or set DRAWIO_CLI)");
+    console.log("draw.io CLI : missing (draft tools work; guarded completion remains blocked)");
   }
 
   return ok ? 0 : 1;

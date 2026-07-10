@@ -59,6 +59,13 @@ def find_drawio_cli() -> str | None:
     for candidate in DEFAULT_DRAWIO_PATHS:
         if Path(candidate).exists():
             return candidate
+    # Gerard's guarded fork may keep a verified, uninstalled desktop runtime
+    # under the repository cache. Walk ancestors so the skill still works
+    # through a symlinked ~/.agents/skills installation.
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ".cache" / "drawio-runtime" / "draw.io.app" / "Contents" / "MacOS" / "draw.io"
+        if candidate.exists():
+            return str(candidate)
     return None
 
 

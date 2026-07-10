@@ -105,7 +105,7 @@ Restart Claude — the skill shows up in the Skills panel and auto-invokes when 
 - **Claude Code or Claude Desktop / Claude.ai** — any recent version with skills support.
 - **Python 3.8+ on your PATH** — the diagram engine (template selection, icon extraction, autofix, validation, scoring) is plain Python with zero third-party dependencies. Check with `python3 --version`.
 - **draw.io to open the result** — the [desktop app](https://www.drawio.com/) or [app.diagrams.net](https://app.diagrams.net). Only needed to view/edit; the skill writes the `.drawio` without it.
-- **The draw.io desktop CLI for completion** — an editable draft can be created without it, but the guarded final gate requires rendered candidate/reference images and a hash-bound visual review.
+- **The draw.io desktop CLI for completion** — an editable draft can be created without it, but the guarded final gate requires rendered candidate/reference images and a hash-bound visual review. The renderer is discovered from `$DRAWIO_CLI`, standard install paths, or a verified project-local `.cache/drawio-runtime/draw.io.app`.
 - **No API keys, no `npm install`, no MCP server, no cloud calls** — every icon, template, and script is bundled and runs locally.
 
 ---
