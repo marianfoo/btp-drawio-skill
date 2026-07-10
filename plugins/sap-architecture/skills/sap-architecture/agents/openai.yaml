@@ -1,0 +1,4 @@
+interface:
+  display_name: "SAP Architecture"
+  short_description: "Guarded SAP draw.io architecture authoring"
+  default_prompt: "Use $sap-architecture to create and verify an editable SAP BTP architecture diagram from my requirements."

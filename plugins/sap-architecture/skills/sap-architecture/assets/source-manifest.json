@@ -1,0 +1,413 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-10",
+  "fork_upstream": "https://github.com/marianfoo/btp-drawio-skill",
+  "fork_upstream_commit": "2484140fb29f2083a8209dd9c22ce099ffcbe418",
+  "source_revision_status": "Bundled-file hashes are authoritative. Exact SAP upstream commits were not recorded by the source package; do not infer them from current repository HEADs.",
+  "reference_count": 71,
+  "reference_counts_by_source": {
+    "SAP/architecture-center": 52,
+    "SAP/btp-solution-diagrams": 11,
+    "SAP/sap-btp-reference-architectures": 8
+  },
+  "library_count": 10,
+  "references": [
+    {
+      "file": "ac_RA0001_E2B_CloudConnector.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "924772fc0ea8f7a2209d592fa4c4d93889f8ed28aaeda50bb521efc0ec2bc485"
+    },
+    {
+      "file": "ac_RA0001_E2B_PrivateLink.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "ff610a4eda3cabdc8622c27ecefe41085c4b6def9e8c3c55a66135b741ab3db9"
+    },
+    {
+      "file": "ac_RA0001_EventDriven_HybridEnterprise.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "de72c6e197bdd1937d05cce11d8af0c64f863245c747466f653a2bed7e09e9ea"
+    },
+    {
+      "file": "ac_RA0001_EventDriven_RefArch.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "d9440d954518ceff9310d83b4fa20cbb68b4e1c9784670836eb92f7884012da9"
+    },
+    {
+      "file": "ac_RA0001_EventDriven_SAPEnterprise.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "202d201f8ff36541aa618610ca5f00c983d29b2c147440a04f8cefed0b4441a9"
+    },
+    {
+      "file": "ac_RA0002_LoadBalancer.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "240e22c784b38af0aeb8adad937cd2e031d37bf56137ac7bfde419dd4c5792c5"
+    },
+    {
+      "file": "ac_RA0002_MultiAZ.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "9068660e4e51ea0c6204bdb6964fd9feaa21ef10de2b70091e97eda52e2340a6"
+    },
+    {
+      "file": "ac_RA0002_MultiRegionResiliency.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "1e598aa68efe471fc0f1bc5034b2c95508641933b130ad051c3527cdc13ab60e"
+    },
+    {
+      "file": "ac_RA0003_FederatedML.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "92f6466afe4bdbf4d9dc4df83a0d4accf54485e2544800f83985b8224fca31f1"
+    },
+    {
+      "file": "ac_RA0004_AWSDataIntegration.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "33be1cfea7c660acc05f2350b65367546f28bd68ac347de547515943a3f50742"
+    },
+    {
+      "file": "ac_RA0004_AzureDataIntegration.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "4542b1e458ebe34daea619ad09600b3ea9c86e42b5a28dc0362f64db3bc00774"
+    },
+    {
+      "file": "ac_RA0004_DatabricksDataIntegration.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "ca247b5fbf32c7244c9bbd4fc2fa74a20f28a56d32ad664e92170b7c6ace4954"
+    },
+    {
+      "file": "ac_RA0004_HyperscalerData.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "93f1a0f02219e5904232769fe36603f0e07f333618c70f454bd5f0ba59554c45"
+    },
+    {
+      "file": "ac_RA0005_Agent2Agent.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "b93edad88c14c17a2842fe0491c4fb7cc9f374f411cc681efd00cba279751c6e"
+    },
+    {
+      "file": "ac_RA0005_GenAI.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "72ef90fa28edcf4424dda02e6ed87610ff9e97b05630b212be9f062c42f48f41"
+    },
+    {
+      "file": "ac_RA0005_GenAI_RAG.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "8f9d6eab82fa9b60d6f063e06ef5d8aa6a7b56942d078fc7b706fb49c5f62a7e"
+    },
+    {
+      "file": "ac_RA0005_GenAI_SemanticSearch.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "6bb1d225568a7e2488321b924c411087fb7c8bb0363d2b3f7958392bd225f4f2"
+    },
+    {
+      "file": "ac_RA0006_PrivateLinkService.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "e70cbf3042cee45d143090c8f6088518ef49d0d3136efd11fc2f7466412adeee"
+    },
+    {
+      "file": "ac_RA0007_SuSaaS_CAP_Multitenant.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "52e77eab0385a1ef59290f3e68e2ffe83376453a8fab50c8ecc9f62b54a72b05"
+    },
+    {
+      "file": "ac_RA0008_EdgeIntegrationCell.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "29ef9f2c0c9f4984844d46bd7992d03f80252496ac0ffce98e9c125678545730"
+    },
+    {
+      "file": "ac_RA0009_TaskCenter_CentralInbox.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "179e547c02cf0779d1411d3c41d08e4fbf93c8e7a0524ecebb6e3b356bd0090b"
+    },
+    {
+      "file": "ac_RA0010_BuildWorkZone.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "5fc114e0d2b51ef3e1c15347bd04a150470017878468930a1362918e96813028"
+    },
+    {
+      "file": "ac_RA0013_BDC_AICore.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "16b46a3820276ed2d7b975c50e80570314eaf647ce02aad9a3bbc8c081caf242"
+    },
+    {
+      "file": "ac_RA0013_BDC_CloudIdentity.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "2c6059a021e0da33ba03829178d3289f4abf1d6ad59f3932a6aff004e91f2afe"
+    },
+    {
+      "file": "ac_RA0013_BDC_Databricks.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "be540d4f0a6188093c7ba230bb3babf1daff6e4ac8f50c66edc44dcfdac1d681"
+    },
+    {
+      "file": "ac_RA0013_BusinessDataCloud.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "62e0ac9e8f2c6af4df0658d15862228a4887101dadb0f27348e93fb0fb916c0a"
+    },
+    {
+      "file": "ac_RA0014_OData_AppRouter_PrivateLink.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "c2e9009dd0386400f090378d3563ca10bca1fdcdc7d9faf7a2e07457e6c46036"
+    },
+    {
+      "file": "ac_RA0014_OData_CAP_PrivateLink.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "1d0470ed3ae9c37eebfb0cd38fc830a379a9413748dca7c7e5b0616c033d175c"
+    },
+    {
+      "file": "ac_RA0018_BuildProcessAutomation.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "173d5f1557a294376282deb768a75e34af34757869a20675f7b369ca3b3dcf6b"
+    },
+    {
+      "file": "ac_RA0019_Authentication.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "ba3862f88c078f20bef64af4e18a5cda350ecb0f08e2144efaa172b0dd4d5e2f"
+    },
+    {
+      "file": "ac_RA0019_Authorization.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "8f59feab1a402979eb152aaa1a96b728230721acf961feb0ad9c52b3fa804648"
+    },
+    {
+      "file": "ac_RA0019_IAM_overview.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "e0df10cd3c20ddc1fe51fedfc2a38872b63a2d58ae9c7748563d919e632442ca"
+    },
+    {
+      "file": "ac_RA0019_IdentityLifecycle.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "8e9355dbba6a1e6d3585f39ba702ded7e41168502dc1a63f4601c982afc5bc20"
+    },
+    {
+      "file": "ac_RA0020_B2BIntegration.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "2837adca7e7057c54210098124bfbebc69a588f8798bc5e7ef14ba880f390e58"
+    },
+    {
+      "file": "ac_RA0021_A2AIntegration.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "1c2a4d9ff2a9813a231a7866c9b222307f44158309b2d500fdc831d9bce77d54"
+    },
+    {
+      "file": "ac_RA0022_APIManagedIntegration.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "172359dd145964b17cdc96b26291bcaa051d6d62cb6e61950711f3f9439397dd"
+    },
+    {
+      "file": "ac_RA0023_DevOps.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "cb21cdc68335856341bc549d08dbd43e9a2c949ac5e0027b283d73a81acf5ee4"
+    },
+    {
+      "file": "ac_RA0024_Joule_IAM_CDM.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "c511db2e50d49c99417fec9e809d19910c3c93bce46c1b9bae6fb1cc09e345a3"
+    },
+    {
+      "file": "ac_RA0024_Joule_IAM_authn.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "3481b6a06edaef357a1e1ce494e33055f93b19d8bc3250019f6cf83d303b48e4"
+    },
+    {
+      "file": "ac_RA0024_Joule_S4PublicCloud.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "7d6e550b506918912b964a3e99c4244bcf7597df16e132c81bd55226e54d00c3"
+    },
+    {
+      "file": "ac_RA0024_Joule_Studio.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "99e88b2161f0b7afc96a270f1780d167fe5cc8553015f53722728c00e4f8c2d0"
+    },
+    {
+      "file": "ac_RA0024_UnifiedJoule.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "33829198e2af431306fbf1a9726ab16e7f17873aa8577ab9e9555bd350bf9b44"
+    },
+    {
+      "file": "ac_RA0025_PIPO_EIC_Post.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "5af3597562a548bdf466bb0e83bf878273f324202dc0d62fb9020b7ab456a4ed"
+    },
+    {
+      "file": "ac_RA0025_PIPO_EIC_Pre.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "1ef782f91c3401f00f5eefa870404ca9bd259723be229867fe5e5d23d8ccdaf1"
+    },
+    {
+      "file": "ac_RA0027_SIEM_SOAR_ETD.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "21ee4e0887d5516f1771b2bc7d35f76df4d2259d8350cfdb7fe74c416ed11975"
+    },
+    {
+      "file": "ac_RA0028_SuccessFactorsModuleIntegration.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "83603e90dca41d268ab98c17fc0442f7c254d359be88f15d11df185de6b6fd45"
+    },
+    {
+      "file": "ac_RA0029_A2A_MCP.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "d46cf964e8d2e477ac1a4a201735058ea315f96916424c0421f21a2e257f04fb"
+    },
+    {
+      "file": "ac_RA0029_AgenticAI_root.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "169ecbb7a817f88d6de7a1487931aa11bc47e57edb6a5a4a868c3ac9f70a0751"
+    },
+    {
+      "file": "ac_RA0029_EmbodiedAIAgents.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "e043fa5f03bd01d57a9a44bc50e77b637aace5f835f233a2fa013113503d9ed7"
+    },
+    {
+      "file": "ac_RA0029_GenAI_ProCode.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "67b388096b827e922ff659bd353987ed1286aefe0474d35c3f6c10428fece06c"
+    },
+    {
+      "file": "ac_RA0029_IntegrateAIAgentsWithJoule.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "0f563ef32f75c5548161d5da1b994730aeba19215eaa40e5dcbcaafc60978d0b"
+    },
+    {
+      "file": "ac_RA0029_JouleAgentsToolsEcosystem.drawio",
+      "source_group": "SAP/architecture-center",
+      "sha256": "bf74f14496bd7e19ea5852974771eb5b4c23a60afc3ed509e4494c464dbd2527"
+    },
+    {
+      "file": "btp_SAP_Build_Process_Automation_L2.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "ab0b079742af884907ce915817f9ee11643eebc97aeeec8a70659bfeec658763"
+    },
+    {
+      "file": "btp_SAP_Build_Work_Zone_L2.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "767d483e60c3ecf47ca79578b059b053b2c572362016d1cde833e6196be121f5"
+    },
+    {
+      "file": "btp_SAP_Cloud_Identity_Services_Authentication_L2.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "5f5697d6a20c5bb5462f253bd4270d32c0a0f8a9d5eb959648bfeb816aff8a90"
+    },
+    {
+      "file": "btp_SAP_Cloud_Identity_Services_Authentication_preset_L2.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "920c63fd53009948823739adeb7b30d65938422adb4c751f52706b523b0fea08"
+    },
+    {
+      "file": "btp_SAP_Cloud_Identity_Services_Authorization_L1.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "c547681da3fb7780e27a1012724185a25c55ac20fc2870379fdb02589ca94246"
+    },
+    {
+      "file": "btp_SAP_Cloud_Identity_Services_Identity_Lifecycle_L1.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "e9d34c166595c4c0b7c172407efd0aaae75df494015cf58990f659491ec24258"
+    },
+    {
+      "file": "btp_SAP_Private_Link_Service_L2.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "b95678d27f356c452d20626eb481f5d291a9c86f9635bf11ca54976423c9b377"
+    },
+    {
+      "file": "btp_SAP_Start_L2.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "82f81123e176c41e2048122e4dfda69ca1175a89ca5e89a6543f9a44eff66221"
+    },
+    {
+      "file": "btp_SAP_Task_Center_L0.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "d8bcd09e13fc9e1d606157d9e6090e10c459dc17c972b0c2be79933c58a6944b"
+    },
+    {
+      "file": "btp_SAP_Task_Center_L1.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "a55f943aa166cf0858f542ce82344754657ae217c6bf208cf1babf524665a82c"
+    },
+    {
+      "file": "btp_SAP_Task_Center_L2.drawio",
+      "source_group": "SAP/btp-solution-diagrams",
+      "sha256": "1586254f1201b074b61ff5b5f118e7e416c3a56ab95ab8b243440beab29d2fb8"
+    },
+    {
+      "file": "ext_BusinessToGovernment.drawio",
+      "source_group": "SAP/sap-btp-reference-architectures",
+      "sha256": "2c2b2ead11ca778a7ed3ea84b9eaf20b7e410ccc0a80bdd7046c9dec9e185a87"
+    },
+    {
+      "file": "ext_CloudLeadingAuthn.drawio",
+      "source_group": "SAP/sap-btp-reference-architectures",
+      "sha256": "249f8e634f15e4a3b0c3e408d06311aa633767afdab27fd6454f1c567d83c6fe"
+    },
+    {
+      "file": "ext_EventsToBusinessActions.drawio",
+      "source_group": "SAP/sap-btp-reference-architectures",
+      "sha256": "0b798ac5a80be89f5c14e81505393ccd8d771814f743d9fb6a5d0d00f131cfe9"
+    },
+    {
+      "file": "ext_FederatedML_v2.drawio",
+      "source_group": "SAP/sap-btp-reference-architectures",
+      "sha256": "341068006405258cee1478609d7ee86802ac1eb239738aa330048d6dc4f2a909"
+    },
+    {
+      "file": "ext_GenAI_RAG_v2.drawio",
+      "source_group": "SAP/sap-btp-reference-architectures",
+      "sha256": "47497a14d70a6cdd87738f09908a6f531446a26308e22d12ce6116df1fd78686"
+    },
+    {
+      "file": "ext_HyperscalerDatasphere.drawio",
+      "source_group": "SAP/sap-btp-reference-architectures",
+      "sha256": "021fb0537cbae3a1eea3b724a234c26c2f3f70ebd99eda5cd34265ab0514d36b"
+    },
+    {
+      "file": "ext_MasterDataIntegration.drawio",
+      "source_group": "SAP/sap-btp-reference-architectures",
+      "sha256": "82456be88c9373ab3c9027e45d509ab320e8f75d434c7bf5e1fec9540b8b0911"
+    },
+    {
+      "file": "ext_MultiRegionResiliency_v2.drawio",
+      "source_group": "SAP/sap-btp-reference-architectures",
+      "sha256": "3c0d490c14ca10670650c4dd2e9b88e9b45c1f718f9929e98dcafc9b4b5c4aaa"
+    }
+  ],
+  "libraries": [
+    {
+      "file": "annotations_and_interfaces.xml",
+      "sha256": "ef4c4d3821b519495bee57276309edba6f644f4160eb3fe81576afeb2c07bb3e"
+    },
+    {
+      "file": "area_shapes.xml",
+      "sha256": "8355ffef455cecd4b2433560286888605de733ff5dec2ed54e4a8da3561163ed"
+    },
+    {
+      "file": "btp-service-icons-all-size-M.xml",
+      "sha256": "e74c51b2375db9edc2153fe83d027c2738618a620530220992579e5a0c2198f9"
+    },
+    {
+      "file": "connectors.xml",
+      "sha256": "90c887b52dfc2988789cadf746d5d2357ba2a9e40184aae663f0e5065058a801"
+    },
+    {
+      "file": "default_shapes.xml",
+      "sha256": "4c0eb4b43722433086c14f6a2ca2257c1f51b31f3b2f96b66d259db909d6dea0"
+    },
+    {
+      "file": "essentials.xml",
+      "sha256": "3bb1fdd8cb46cf2ccec4a8e4c30ee46d3b2f4d83685781c12edcca1599bdabfb"
+    },
+    {
+      "file": "numbers.xml",
+      "sha256": "3a13e2208c67027d9bc78f161a0176b63dafa93346212ae8f290c78e64232ced"
+    },
+    {
+      "file": "sap-generic-icons-size-M-200302.xml",
+      "sha256": "4286d51671d67b640c7d519be9a8f432d993fb37435b227137fa8d396adbd954"
+    },
+    {
+      "file": "sap_brand_names.xml",
+      "sha256": "a7b2d0077f670976163b74fa2088150cb6518d6edd994e1af584ad0aab9cc069"
+    },
+    {
+      "file": "text_elements.xml",
+      "sha256": "a80f235bffb070806097e2280c8f7104f912a6071e58d5e16f7feaaa238949ff"
+    }
+  ]
+}

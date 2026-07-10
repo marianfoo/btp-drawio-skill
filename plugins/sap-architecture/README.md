@@ -88,12 +88,13 @@ If you paste a long design document, add a short scope sentence that says which 
 
 ## Workflow (what happens when triggered)
 
-1. **Parse → plan** — infer level / zones / services / numbered flow / accent app from the description.
-2. **Scaffold from a SAP reference template — mandatory** — run `scripts/scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks bundled SAP templates against the request, copies the best match, and prints alternates. Never write XML from scratch.
-3. **Place library assets** — call `scripts/extract_icon.py` for each BTP service and `scripts/extract_asset.py` for generic icons, connector presets, number bubbles, interface pills, and other SAP starter-kit assets.
-4. **Surgically relabel** — use `relabel.py` for bulk id/visible-label changes where possible, then change only the remaining labels in-place; preserve canvas size, zone hierarchy, network divider, SAP logos, footer, identity flow.
-5. **Validate + autofix + score — mandatory** — `autofix.py --write`, `validate.py` (now catches dark `pageBackgroundColor`, off-vocabulary pill verbs like `PROMPT/ROUTE/CONTEXT/DELEGATE`, and duplicate SAP-logo over-use), then `score_corpus.py --min-score 90` for template-derived diagrams or `score_corpus.py --min-sap-like 90` for semantic fallback diagrams. Evaluation runs also score against the specific target reference; the skill will not hand back a diagram until the validator exits clean and the relevant quality score is high.
-6. **Narrate** — print a numbered markdown list explaining each pill / flow step, for pasting below the embedded image in Confluence / Markdown.
+1. **Lock semantics** — create a JSON contract for required zones, nodes, directed flows, terms, and exclusions before template selection.
+2. **Scaffold and pin** — run `scaffold_diagram.py`, copy the closest SAP template, and retain that exact file as the target. Never write XML from scratch.
+3. **Sanitize provenance** — run `provenance.py` before editing to mark the derivative, remove detectable official identifiers/links, add visible attribution, and surface ambiguous QR-like raster images for review.
+4. **Edit surgically** — relabel and use official library assets; remove complete irrelevant branches and keep the semantic contract synchronized.
+5. **Run guarded gates** — autofix, semantic validation, strict provenance audit, and either zero new warnings plus pinned-template score at least 90 (template mode), or zero warnings plus SAP-likeness at least 90 (justified semantic fallback).
+6. **Render and inspect** — `verify_delivery.py` creates candidate/reference PNGs and stops at `awaiting-visual-review`; inspect both and record a hash-bound review with `record_visual_review.py`.
+7. **Complete and narrate** — rerun `verify_delivery.py` to `pass`, then print the numbered flow narration below the diagram.
 
 Full details in [`skills/sap-architecture/SKILL.md`](skills/sap-architecture/SKILL.md).
 
@@ -113,6 +114,10 @@ All scripts use only the Python standard library — zero pip install required.
 | `template_browser.py` | Pre-render all 71 bundled SAP templates into a thumbnail gallery with filter, domain badges, and the exact `scaffold_diagram.py --template …` command for each. Useful when you need to pick the right starting template visually. |
 | `select_reference.py "<request>"` | Rank bundled SAP templates for a natural-language request using curated metadata, filenames, aliases, levels, and visible labels. Use before editing XML. |
 | `validate.py <file>` | Structural + style validator. Catches bent arrows, text overflow, off-palette, off-grid, duplicate ids, sibling overlap, missing `labelBackgroundColor`. `--strict` turns warnings into errors. `--json` for machine-readable output. |
+| `validate_semantics.py <file> <spec.json>` | Enforce the pre-authored request contract: required zones/nodes/terms, forbidden terms, and directed flows. |
+| `provenance.py <file> ...` | Mark a derivative, strip detectable source identifiers/links, add visible attribution, and block unresolved QR-like raster images. |
+| `verify_delivery.py <file> <spec.json> --target <template>` | Run semantic, provenance, strict structural-delta, pinned-template, rendering, and hash-bound visual-review gates. |
+| `record_visual_review.py <candidate.png> <reference.png> ...` | Create the machine-readable visual-review record only after all required pixel checks were performed. |
 | `autofix.py --write <file>` | Mechanical fixer: grid snap, hex case, `absoluteArcSize=1`, `strokeWidth` rounding, `fontFamily`→Helvetica. Writes a `.bak` backup. |
 | `compare.py <reference> <candidate>` | Pairwise structural/style/content fingerprint score. |
 | `score_corpus.py <candidate>` | Report corpus similarity plus reference-free SAP-likeness; use `--min-score 90` for template-derived diagrams and `--min-sap-like 90` for semantic fallback diagrams. |

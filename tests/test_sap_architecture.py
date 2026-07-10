@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import sys
 import tempfile
@@ -36,6 +37,9 @@ render_semantic = load_script("render_semantic")
 relabel = load_script("relabel")
 scaffold_diagram = load_script("scaffold_diagram")
 validate = load_script("validate")
+validate_semantics = load_script("validate_semantics")
+provenance = load_script("provenance")
+verify_delivery = load_script("verify_delivery")
 
 
 class CompareTests(unittest.TestCase):
@@ -382,6 +386,219 @@ class SemanticRendererTests(unittest.TestCase):
             semantic_score = compare.compare(compare.fingerprint(target), compare.fingerprint(out)).score
             weak_score = compare.compare(compare.fingerprint(target), compare.fingerprint(weak_template)).score
             self.assertGreaterEqual(semantic_score, weak_score + 7.0)
+
+
+class GuardedSemanticTests(unittest.TestCase):
+    SIMPLE_DIAGRAM = """<mxfile>
+  <diagram id="test" name="test">
+    <mxGraphModel page="1" pageWidth="800" pageHeight="600">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="zone" value="SAP BTP" vertex="1" parent="1"
+          style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=16;strokeColor=#0070F2;fillColor=#EBF8FF;fontFamily=Helvetica;">
+          <mxGeometry x="40" y="80" width="700" height="420" as="geometry"/>
+        </mxCell>
+        <mxCell id="app" value="CAP Application" vertex="1" parent="zone"
+          style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=12;strokeColor=#0070F2;fillColor=#FFFFFF;fontFamily=Helvetica;">
+          <mxGeometry x="60" y="120" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="dest" value="SAP Destination service" vertex="1" parent="zone"
+          style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=12;strokeColor=#0070F2;fillColor=#FFFFFF;fontFamily=Helvetica;">
+          <mxGeometry x="360" y="120" width="200" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="protocol" value="OData/REST" vertex="1" parent="1"
+          style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=50;strokeColor=#475E75;fillColor=#FCFCFC;fontFamily=Helvetica;">
+          <mxGeometry x="310" y="210" width="100" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow" edge="1" parent="1" source="app" target="dest"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#475E75;fontFamily=Helvetica;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"""
+
+    def write_case(self, tmp: str, *, reverse: bool = False) -> tuple[Path, Path]:
+        drawio = Path(tmp) / "case.drawio"
+        spec = Path(tmp) / "case.spec.json"
+        text = self.SIMPLE_DIAGRAM
+        if reverse:
+            text = text.replace('source="app" target="dest"', 'source="dest" target="app"')
+        drawio.write_text(text, encoding="utf-8")
+        spec.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "subject": "CAP application through Destination",
+                    "level": "L2",
+                    "required_zones": ["SAP BTP"],
+                    "required_nodes": [
+                        {"name": "CAP application", "aliases": ["CAP Application"]},
+                        "SAP Destination service",
+                    ],
+                    "required_flows": [
+                        {"from": "CAP application", "to": "SAP Destination service"}
+                    ],
+                    "required_terms": ["OData/REST"],
+                    "forbidden_terms": ["Direct public internet access"],
+                    "provenance": {"allowed_raster_hashes": []},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return drawio, spec
+
+    def test_semantic_contract_passes_required_content_and_direction(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            drawio, spec = self.write_case(tmp)
+            report = validate_semantics.validate_semantics(drawio, spec)
+        self.assertEqual([], report.errors)
+        self.assertEqual(1, len(report.matched["required_flows"]))
+
+    def test_semantic_contract_rejects_reversed_flow(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            drawio, spec = self.write_case(tmp, reverse=True)
+            report = validate_semantics.validate_semantics(drawio, spec)
+        self.assertTrue(any(issue.code == "missing-flow" for issue in report.errors))
+
+    def test_sap_looking_reference_fails_when_request_component_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = Path(tmp) / "wrong.spec.json"
+            spec.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "subject": "Cloud Connector requirement",
+                        "level": "L2",
+                        "required_nodes": ["Impossible Bespoke Control Plane"],
+                        "required_zones": [],
+                        "required_flows": [],
+                        "required_terms": [],
+                        "forbidden_terms": [],
+                        "provenance": {"allowed_raster_hashes": []},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = validate_semantics.validate_semantics(
+                REFERENCE_DIR / "ac_RA0029_AgenticAI_root.drawio", spec
+            )
+        self.assertTrue(any(issue.code == "missing-required_nodes" for issue in report.errors))
+
+
+class ProvenanceTests(unittest.TestCase):
+    SOURCE_DIAGRAM = """<mxfile>
+  <diagram id="test" name="test">
+    <mxGraphModel page="1" pageWidth="800" pageHeight="600">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="ref" value="Official RA0029" vertex="1" parent="1"
+          style="text;html=1;fontFamily=Helvetica;">
+          <mxGeometry x="20" y="20" width="100" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="qr" value="QR" vertex="1" parent="1"
+          data-provenance-role="official-qr"
+          style="shape=image;image=data:image/png,AAAA;">
+          <mxGeometry x="700" y="500" width="60" height="60" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>"""
+
+    def test_sanitizer_removes_reference_identifiers_and_marks_derivative(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.drawio"
+            output = Path(tmp) / "output.drawio"
+            source.write_text(self.SOURCE_DIAGRAM, encoding="utf-8")
+            removed = provenance.sanitize_file(
+                source,
+                output,
+                source_template="ac_RA0029_AgenticAI_root.drawio",
+                source_url="https://github.com/SAP/architecture-center",
+            )
+            root = ET.parse(output).getroot()
+            report = provenance.audit_tree(root)
+            ref_cell = next(cell for cell in root.iter("mxCell") if cell.get("id") == "ref")
+        self.assertIn("qr", removed)
+        self.assertEqual("true", root.get("data-guarded-derivative"))
+        self.assertEqual([], report.errors)
+        self.assertEqual("Official ", ref_cell.get("value"))
+
+    def test_unreviewed_square_raster_is_blocking_in_strict_workflow(self) -> None:
+        root = ET.fromstring(self.SOURCE_DIAGRAM.replace('value="QR"', 'value=""').replace(' data-provenance-role="official-qr"', ''))
+        provenance.sanitize_tree(
+            root,
+            source_template="template.drawio",
+            source_url="https://example.invalid/template",
+        )
+        report = provenance.audit_tree(root)
+        self.assertEqual(1, len(report.warnings))
+        digest = report.candidate_raster_hashes[0]
+        allowed = provenance.audit_tree(root, allowed_raster_hashes={digest})
+        self.assertEqual([], allowed.warnings)
+
+
+class GuardedReviewTests(unittest.TestCase):
+    def test_visual_review_is_hash_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate = Path(tmp) / "candidate.png"
+            reference = Path(tmp) / "reference.png"
+            review = Path(tmp) / "review.json"
+            candidate.write_bytes(b"candidate")
+            reference.write_bytes(b"reference")
+            checks = {
+                "nonblank": True,
+                "legible": True,
+                "no_incoherent_overlap": True,
+                "flows_traceable": True,
+                "provenance_visible": True,
+                "sap_style_consistent": True,
+            }
+            review.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "reviewer": "Codex",
+                        "verdict": "pass",
+                        "notes": "Both images inspected at full resolution.",
+                        "candidate_sha256": hashlib.sha256(b"candidate").hexdigest(),
+                        "reference_sha256": hashlib.sha256(b"reference").hexdigest(),
+                        "checks": checks,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual([], verify_delivery.load_visual_review(review, candidate, reference))
+            incomplete = json.loads(review.read_text(encoding="utf-8"))
+            incomplete["checks"] = {"nonblank": True}
+            review.write_text(json.dumps(incomplete), encoding="utf-8")
+            incomplete_errors = verify_delivery.load_visual_review(review, candidate, reference)
+            self.assertTrue(any("checks are incomplete" in error for error in incomplete_errors))
+            candidate.write_bytes(b"changed")
+            errors = verify_delivery.load_visual_review(review, candidate, reference)
+        self.assertTrue(any("changed after visual review" in error for error in errors))
+
+
+class SourceManifestTests(unittest.TestCase):
+    def test_source_manifest_covers_all_bundled_templates_with_current_hashes(self) -> None:
+        manifest_path = SKILL_DIR / "assets" / "source-manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(71, manifest["reference_count"])
+        self.assertEqual(
+            {
+                "SAP/architecture-center": 52,
+                "SAP/btp-solution-diagrams": 11,
+                "SAP/sap-btp-reference-architectures": 8,
+            },
+            manifest["reference_counts_by_source"],
+        )
+        for item in manifest["references"]:
+            path = REFERENCE_DIR / item["file"]
+            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), item["sha256"])
 
 
 if __name__ == "__main__":

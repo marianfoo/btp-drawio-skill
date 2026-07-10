@@ -4,7 +4,7 @@ A deep dive into `btp-drawio-skill` — how the skill turns a prompt into a diag
 
 ## Contents
 
-- [How it works (the 6-step pipeline)](#how-it-works-the-6-step-pipeline)
+- [How it works (the guarded pipeline)](#how-it-works-the-guarded-pipeline)
 - [Design rules the skill enforces](#design-rules-the-skill-enforces)
 - [Run it yourself: Python scripts (no LLM)](#run-it-yourself-python-scripts-no-llm)
 - [npx, MCP, and MCPB (non-Claude tools)](#npx-mcp-and-mcpb-non-claude-tools)
@@ -15,19 +15,19 @@ A deep dive into `btp-drawio-skill` — how the skill turns a prompt into a diag
 
 ---
 
-## How it works (the 6-step pipeline)
+## How it works (the guarded pipeline)
 
 The skill is an **authoring assistant**, not a one-shot generator. The realistic workflow takes 15-30 min per diagram; ~⅓ of scenarios pass the corpus loop without manual editing, the remaining ⅔ need surgical edits in draw.io desktop. See [`references/manual-workflow.md`](../plugins/sap-architecture/skills/sap-architecture/references/manual-workflow.md) for the time-budget table and the full loop.
 
-When triggered, the skill runs a 6-step pipeline (documented in full in [`SKILL.md`](../plugins/sap-architecture/skills/sap-architecture/SKILL.md)):
+When triggered, the skill runs a guarded pipeline (documented in full in [`SKILL.md`](../plugins/sap-architecture/skills/sap-architecture/SKILL.md)):
 
-1. **Parse → plan** — infer level (L0/L1/L2, default L2), zones, services, numbered flow steps, and which service is the "star" (accent color).
-2. **Scaffold from a SAP reference template — MANDATORY** — run `scaffold_diagram.py "<request>" --out <file>.drawio`. The script ranks the 71 bundled SAP templates against the request, copies the best match to the destination, and prints alternates. The single most common cause of bad diagrams is the LLM trying to write XML from scratch — `scaffold_diagram.py` removes that temptation. Use `template_browser.py` (pre-rendered thumbnail gallery of all 71) when picking visually is faster than reading filenames.
-3. **Place BTP service icons** — fuzzy-lookup each service via `extract_icon.py`, which emits an `<mxCell>` with the official inline-SVG data URI and grid-snapped geometry.
-4. **Surgical relabel** — change labels with `relabel.py` where possible, swap services, add a few cards next to the existing ones. **Preserve canvas size, zone hierarchy, network divider, SAP logos, footer, and identity flow.** For complex scenarios that need more than relabeling, open the file in draw.io desktop and edit directly. Reference docs: `references/layout.md`, `palette-and-typography.md`, `shapes-and-edges.md`, `do-and-dont.md`, `manual-workflow.md`.
-5. **Validate, autofix, score — mandatory** — `autofix.py --write` first (mechanical repairs), then `validate.py` (catches dark page backgrounds, novelty pill verbs like PROMPT/ROUTE/CONTEXT/DELEGATE, multi-logo over-use), then `score_corpus.py --min-score 90` for template-derived diagrams or `score_corpus.py --min-sap-like 90` for semantic fallback diagrams.
-5b. **Visual review (the missing last 20%)** — `render_compare.py <ref>.drawio <cand>.drawio --open` builds an HTML page with side-by-side rendered PNGs, structural score breakdown, and **actionable suggestions mapped to the lowest-scoring fingerprint dimensions**. The fingerprint score is necessary but insufficient; the visual review catches what XML diffing can't.
-6. **Narrate the flow** — print a numbered list explaining what each pill means, for pasting below the embedded image in Markdown / Confluence.
+1. **Lock semantics** — create a versioned JSON contract for required zones, nodes, directed flows, terms, and exclusions before looking at templates.
+2. **Scaffold and pin** — run `scaffold_diagram.py`, copy the best SAP template, and retain that exact file as the comparison target.
+3. **Sanitize provenance** — run `provenance.py` immediately. Mark the artifact as a derivative, strip detectable official reference identifiers/links, add visible attribution, and review ambiguous square raster images before allowing their hashes.
+4. **Edit surgically** — relabel, swap official assets, and remove complete irrelevant branches while keeping the semantic contract synchronized.
+5. **Run deterministic gates** — autofix and validate semantics/provenance. Template mode allows only inherited warnings and requires pinned-template score at least 90; justified semantic fallback allows no warnings and requires SAP-likeness at least 90.
+6. **Render and inspect** — `verify_delivery.py` renders candidate/reference PNGs and stops at `awaiting-visual-review`. A reviewer inspects the pixels and records all required checks with `record_visual_review.py`.
+7. **Bind completion** — rerun `verify_delivery.py` with the hash-bound review. Only `status: pass` supports a verified completion claim. Then print the flow narration outside the canvas.
 
 ---
 
@@ -277,25 +277,16 @@ The skill is a plain [Agent Skills](https://agentskills.io)-compliant bundle —
 Whatever the tool: the agent needs shell access and **Python 3.8+** to run the scripts, and works best with a strong model (see [Recommended models](../README.md#recommended-models)). Paste this ready-made instruction block (it's also the fallback when your host can't read files):
 
 ```
-You have access to the SAP Architecture Skill. When the user asks for an SAP /
-BTP / on-prem architecture diagram, follow the 6-step workflow in SKILL.md:
-
-1. Parse description → plan (L0/L1/L2, zones, services, flow, accent)
-2. ALWAYS scaffold from a SAP reference template (NEVER write XML from scratch):
-     scripts/scaffold_diagram.py "<request>" --out <destination>.drawio
-3. Place BTP service icons via scripts/extract_icon.py / extract_asset.py
-4. Make surgical label edits with scripts/relabel.py where possible — do NOT
-   rewrite the file. Preserve canvas size, zone hierarchy, network divider,
-   SAP logos, footer, and identity flow.
-5. MANDATORY: run scripts/autofix.py --write <file>, scripts/validate.py
-   <file>, and scripts/score_corpus.py --min-score 90 <file>
-   # for semantic fallback output: scripts/score_corpus.py --min-sap-like 90 <file>
-6. Print the flow narration as a numbered markdown list
-
-Hard rules enforced by the validator: no dark page backgrounds; flow pills must
-use canonical SAP verbs (TRUST/Authenticate/Authorization/A2A/MCP/ORD/HTTPS/
-OData/REST/SAML2/OIDC); preserve grey-circle icons; trust=pink, auth=green,
-authorization=indigo, firewalls=thick grey; 16-px corner radius.
+You have access to the SAP Architecture Skill. Resolve SKILL_DIR to the directory
+containing SKILL.md; do not assume a host-specific skills directory. Before template
+selection, create the semantic specification required by references/semantic-spec.md.
+Scaffold and pin one SAP template, run provenance.py to mark and sanitize the
+derivative, edit surgically, and run autofix.py. Complete only through
+verify_delivery.py: semantic and provenance checks, strict structural-warning delta,
+pinned-template score, rendered candidate/reference images, actual visual inspection,
+and a hash-bound review recorded with record_visual_review.py. Never write draw.io XML
+from scratch, preserve stale source QR/reference identifiers, or claim verified status
+without gate-report.json status pass.
 ```
 
 ---
@@ -443,7 +434,7 @@ btp-drawio-skill/
         ├── README.md                      ← plugin-level deep dive
         └── skills/
             └── sap-architecture/
-                ├── SKILL.md               ← 6-step workflow (<500 lines)
+                ├── SKILL.md               ← concise guarded workflow
                 ├── references/
                 │   ├── levels.md          ← L0/L1/L2 decision guide
                 │   ├── palette-and-typography.md  ← Horizon hex + Helvetica + SAP rules
@@ -452,6 +443,8 @@ btp-drawio-skill/
                 │   ├── do-and-dont.md     ← consolidated SAP rules (verbatim quotes)
                 │   ├── corpus-findings.md ← 2026 SAP corpus profile
                 │   ├── generation-quality.md ← research-backed output checklist
+                │   ├── semantic-spec.md   ← request-to-diagram contract
+                │   ├── guarded-workflow.md ← provenance and completion gates
                 │   ├── external-test-corpus.md ← optional external SAP corpus
                 │   ├── improvement-options.md ← researched ranking of next improvements
                 │   └── methodology.md     ← comparison harness, fidelity claim
@@ -503,13 +496,13 @@ claude --plugin-dir ./plugins/sap-architecture
 
 ```yaml
 # .github/workflows/validate-diagrams.yml
-- name: Validate SAP architecture diagrams
+- name: Run guarded SAP architecture gate
   run: |
-    for f in docs/**/*.drawio; do
-      python3 plugins/sap-architecture/skills/sap-architecture/scripts/autofix.py "$f"
-      python3 plugins/sap-architecture/skills/sap-architecture/scripts/validate.py "$f"
-      python3 plugins/sap-architecture/skills/sap-architecture/scripts/score_corpus.py --min-score 90 "$f"
-    done
+    python3 plugins/sap-architecture/skills/sap-architecture/scripts/verify_delivery.py \
+      docs/example.drawio docs/example.spec.json \
+      --target plugins/sap-architecture/skills/sap-architecture/assets/reference-examples/<pinned-template>.drawio \
+      --out-dir .cache/review/example \
+      --visual-review docs/example.visual-review.json
 ```
 
 ### Regenerating the asset indexes

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -19,6 +19,8 @@ test("doctor reports Python and bundled scripts", () => {
   const out = run(["doctor"]);
   assert.match(out, /python\s+:/);
   assert.match(out, /validate\.py\s+: ok/);
+  assert.match(out, /validate_semantics\.py\s+: ok/);
+  assert.match(out, /verify_delivery\.py\s+: ok/);
 });
 
 test("semantic command creates a valid drawio file", () => {
@@ -45,4 +47,36 @@ test("score command exposes reference-free SAP-likeness score", () => {
   const score = run(["score", "--sap-score", out]).trim();
   assert.match(score, /^\d+\.\d$/);
   assert.ok(Number(score) >= 90);
+});
+
+test("guarded CLI validates semantics and derivative provenance", () => {
+  const dir = mkdtempSync(join(tmpdir(), "btp-drawio-node-guarded-"));
+  const out = join(dir, "app.drawio");
+  const spec = join(dir, "app.spec.json");
+  run(["semantic", "CAP application with SAP HANA Cloud and SAP Fiori frontend", "--out", out]);
+  writeFileSync(
+    spec,
+    JSON.stringify({
+      schema_version: 1,
+      subject: "CAP application",
+      level: "L2",
+      required_zones: ["SAP BTP"],
+      required_nodes: ["CAP Service", "SAP HANA Cloud"],
+      required_flows: [{ from: "CAP Service", to: "SAP HANA Cloud" }],
+      required_terms: ["SQL"],
+      forbidden_terms: [],
+      provenance: { allowed_raster_hashes: [] }
+    })
+  );
+  assert.match(run(["validate-semantics", out, spec]), /0 error\(s\)/);
+  run([
+    "provenance",
+    out,
+    "--source-template",
+    "semantic-fallback",
+    "--source-url",
+    "https://github.com/marianfoo/btp-drawio-skill",
+    "--write"
+  ]);
+  assert.match(run(["provenance", out, "--audit", "--strict"]), /0 error\(s\), 0 warning\(s\)/);
 });
