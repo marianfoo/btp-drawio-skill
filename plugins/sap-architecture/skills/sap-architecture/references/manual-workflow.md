@@ -94,10 +94,15 @@ Open the scaffolded file in draw.io desktop. Make these edits:
 - **Pills** — relabel from the canonical SAP vocabulary
   (TRUST/Authenticate/Authorization/A2A/MCP/ORD/HTTPS/OData/REST/...). 
   Avoid novelty verbs like PROMPT/ROUTE/CONTEXT/DELEGATE.
+- **Semantic-only flow endpoints** — if the visual connector is deliberately attached to a pill, group, or helper cell, keep that visual route intact and add `data-semantic-source` / `data-semantic-target` to express the conceptual endpoints for `validate_semantics.py`.
 
 **Do NOT touch:** canvas size, zone hierarchy, network divider, SAP
 logos, footer band, identity flow placement. Those carry the SAP visual
 identity; preserving them is what keeps the score above 90.
+Also preserve imported-template invariants: some SAP examples use custom
+root/layer IDs, negative coordinates, and `grid="0"` with intentional
+off-grid geometry. Do not normalize these unless you are fixing a
+specific visible defect.
 
 ### Step 5 — autofix + validate
 

@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { resolvedPythonCommand } from "../../lib/python-tools.js";
+import { rankReferences } from "../../src/core/corpus.js";
 import { pyRound, snap10 } from "../../src/core/round.js";
 import { parseCompareStyle, parseValidateStyle } from "../../src/core/styles.js";
 import { canonicalizeXml, elementsByTag, parseXml } from "../../src/core/xml.js";
@@ -381,6 +382,21 @@ test("ported select matches Python top candidates and scores across diverse prom
       prompt
     );
   }
+});
+
+test("ported selector treats explicit exclusions as negative signals", () => {
+  const prompt = [
+    "Create an L2 SAP authentication architecture for a business user accessing an SAP BTP",
+    "application through SAP Cloud Identity Services - Identity Authentication, federated",
+    "with a corporate identity provider using SAML 2.0 or OIDC. Authentication only:",
+    "exclude Identity Provisioning, SCIM, and identity lifecycle."
+  ].join(" ");
+  const ranked = rankReferences(prompt, { top: 5 });
+  assert.equal(basename(ranked[0].path), "btp_SAP_Cloud_Identity_Services_Authentication_L2.drawio");
+  assert.ok(
+    !ranked.slice(0, 3).some((candidate) => basename(candidate.path) === "ac_RA0029_AgenticAI_root.drawio"),
+    "Agentic AI should not be boosted by excluded IAM/provisioning terms"
+  );
 });
 
 test("ported scaffold chooses same template as Python for diverse prompts", () => {

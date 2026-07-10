@@ -42,6 +42,7 @@ Create the specification before template selection. It is the architecture contr
 - Strings match visible draw.io labels case-insensitively after HTML removal.
 - An object adds aliases to the canonical name.
 - `required_flows` are directional by default. Set `"bidirectional": true` only when direction is genuinely not material.
+- Flow matching normally uses visible `source` and `target` labels. If the draw.io edge must remain attached to a pill, group, or helper shape to preserve the SAP route geometry, annotate the edge with `data-semantic-source="<canonical or alias label>"` and `data-semantic-target="<canonical or alias label>"`. These attributes affect semantic validation only; they do not change the visible diagram.
 - `required_terms` prove notation or protocol presence anywhere in the first diagram page. They do not prove that a free-floating pill is attached to a specific edge; visual review must confirm that relationship.
 - `forbidden_terms` catch preserved template content that the request explicitly excludes.
 - Keep aliases narrow. Do not use generic aliases such as `service`, `system`, `cloud`, or `user` merely to make validation pass.

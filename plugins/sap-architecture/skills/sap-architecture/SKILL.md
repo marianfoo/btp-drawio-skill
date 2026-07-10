@@ -71,6 +71,8 @@ This strips detectable official reference identifiers/links and adds visible der
 - Prefer `relabel.py` for text changes.
 - Use `extract_icon.py` and `extract_asset.py` for official assets.
 - Duplicate proven template cells for additions; preserve grid, hierarchy, icon scale, and connector semantics.
+- Preserve imported template invariants: do not assume root/layer IDs `0`/`1`, positive coordinates, or grid snapping. If the source has `grid="0"`, keep off-grid geometry unless a visible defect requires a deliberate edit.
+- When a required conceptual flow terminates on a pill, group, or visually routed edge that should not be rebound, add semantic-only `data-semantic-source` and `data-semantic-target` attributes to the edge. Preserve the visible `source`, `target`, and route geometry.
 - Remove irrelevant branches completely, including their edges, pills, and number markers.
 - Keep the semantic specification synchronized when Gerard changes the requested architecture. Never weaken the specification merely to make a bad diagram pass.
 
