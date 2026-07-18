@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-07-18",
+  "max_age_days": 90,
+  "upstreams": [
+    {
+      "id": "sap-btp-solution-diagrams",
+      "repository": "SAP/btp-solution-diagrams",
+      "release_url": "https://github.com/SAP/btp-solution-diagrams/releases/latest",
+      "latest_observed": "btpsd-v1.0.42",
+      "observed_on": "2026-07-18",
+      "bundled_revision": "unknown",
+      "action_if_changed": "Review release notes, refresh official libraries selectively, rebuild asset indexes and source-manifest hashes, then rerun the full suite."
+    },
+    {
+      "id": "sap-architecture-center",
+      "repository": "SAP/architecture-center",
+      "release_url": "https://github.com/SAP/architecture-center/releases/latest",
+      "latest_observed": "v3.2629.1",
+      "observed_on": "2026-07-18",
+      "bundled_revision": "hash-pinned-only",
+      "action_if_changed": "Diff the identity reference family before refreshing templates; preserve source hashes and rerun template, provenance, semantic, and visual gates."
+    }
+  ],
+  "dated_claims": [
+    {
+      "id": "btp-cf-saml-user-interactive",
+      "checked_on": "2026-07-18",
+      "source_url": "https://userapps.support.sap.com/sap/support/knowledge/en/3521979",
+      "scope": "Customer-owned SAP BTP Cloud Foundry accounts and user-interactive authentication trust configuration; this is not a universal retirement of IdP-initiated SAML in SAP Cloud Identity Services or every SAP SaaS product.",
+      "review_trigger": "Any diagram or narrative recommends SAML or OIDC for BTP user-interactive authentication."
+    },
+    {
+      "id": "iag-ias-api-v1-user-group-sync",
+      "checked_on": "2026-07-18",
+      "source_url": "https://help.sap.com/docs/SAP_CLOUD_IDENTITY_ACCESS_GOVERNANCE/e739622ded9b4d92964c6a0f50b5f90e/45d0b8201167472c8189271efe96919b.html",
+      "scope": "IAS API v1 decommissioning for the documented SAP Cloud Identity Access Governance user-group synchronization scenario; do not generalize it to every SCIM v1 integration.",
+      "deadline": "2026-11-30",
+      "review_trigger": "Any identity pack mentions IAS API v1, Identity Directory API migration, or the 30 November 2026 date."
+    }
+  ]
+}

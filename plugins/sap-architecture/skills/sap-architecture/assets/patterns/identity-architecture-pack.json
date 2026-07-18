@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "pattern": "sap-identity-architecture-pack",
+  "title": "SAP Identity Architecture Pack",
+  "status": "internal-draft",
+  "source_family_url": "https://github.com/SAP/architecture-center/tree/dev/docs/ref-arch/RA0019",
+  "claims": [
+    {
+      "id": "identity-services-capability",
+      "state": "product-capability",
+      "text": "SAP Cloud Identity Services includes Identity Authentication, Identity Directory, and Identity Provisioning capabilities represented by the SAP reference family.",
+      "source_url": "https://architecture.learning.sap.com/docs/ref-arch/20c6b29b1e",
+      "checked_on": "2026-07-18"
+    },
+    {
+      "id": "ias-proxy-proposal",
+      "state": "proposed-design",
+      "text": "Use SAP Identity Authentication as the SAP-facing broker and federate to the corporate identity provider unless current product and client evidence supports an exception.",
+      "decision_status": "client-confirm"
+    },
+    {
+      "id": "ips-lifecycle-proposal",
+      "state": "proposed-design",
+      "text": "Use SAP Identity Provisioning for the proposed source-to-Identity Directory and target lifecycle route; exact sources, transformations, schedules, and deletion semantics remain client-confirmed.",
+      "decision_status": "client-confirm"
+    },
+    {
+      "id": "btp-saml-scope-exception",
+      "state": "protocol-specific-exception",
+      "text": "The BTP user-interactive SAML deprecation scope must not be represented as a universal retirement of IdP-initiated SAML in IAS or every SAP application.",
+      "protocol": "SAML 2.0 / OpenID Connect",
+      "scope": "Customer-owned SAP BTP Cloud Foundry account trust for user-interactive authentication",
+      "source_url": "https://userapps.support.sap.com/sap/support/knowledge/en/3521979"
+    },
+    {
+      "id": "client-configuration-boundary",
+      "state": "client-confirmation",
+      "text": "The pack does not prove configured tenants, trust routes, identifiers, transformations, schedules, role mappings, or operating results.",
+      "confirmation_needed": "Tenant exports, application records, trust metadata, IPS configuration and logs, protocol tests, and target-state evidence."
+    }
+  ],
+  "pages": [
+    {
+      "name": "00--Identity-Landscape",
+      "purpose": "Landscape and claim-state context",
+      "level": "L2",
+      "template": "ac_RA0019_IAM_overview.drawio",
+      "source_url": "https://github.com/SAP/architecture-center/blob/dev/docs/ref-arch/RA0019/drawio/public-sap-iam-sd.drawio",
+      "relabels": [
+        {
+          "match": "Recommended usage of SAP Cloud Identity Services for SAP SaaS",
+          "replacement": "SAP Identity Architecture — landscape [PROPOSED]"
+        },
+        {
+          "match": "Third party identity provider / identity management",
+          "replacement": "Corporate IdP [PROPOSED]"
+        }
+      ],
+      "required_nodes": [
+        "Identity Authentication",
+        "Identity Directory",
+        "Identity Provisioning",
+        {"name": "Corporate Identity Provider", "aliases": ["Corporate IdP [PROPOSED]"]},
+        {"name": "SAP BTP Applications", "aliases": ["SAP BTP Applications - IAM based on SAP Cloud Identity Services", "SAP BTP Applications - IAM based on XSUAA"]}
+      ],
+      "required_terms": ["Authentication", "Authorization", "Identity Lifecycle", "Mutual Trust"],
+      "required_flows": [
+        {"from": "User", "to": "Mobile/Desktop Application Clients"}
+      ],
+      "forbidden_terms": ["Configured client state"]
+    },
+    {
+      "name": "01--IAS-Proxy-and-BTP-Trust",
+      "purpose": "Authentication broker and BTP trust pattern",
+      "level": "L2",
+      "template": "ac_RA0019_Authentication.drawio",
+      "source_url": "https://github.com/SAP/architecture-center/blob/dev/docs/ref-arch/RA0019/1-authentication-and-single-sign-on/drawio/public-sap-authn-sd.drawio",
+      "relabels": [
+        {
+          "match": "Recommended authentication flows and tools for SAP landscapes",
+          "replacement": "IAS proxy and SAP BTP trust [PROPOSED]"
+        },
+        {
+          "match": "Third party identity provider / identity management",
+          "replacement": "Corporate IdP via IAS [PROPOSED]"
+        }
+      ],
+      "required_nodes": [
+        "Identity Authentication",
+        "Identity Directory",
+        {"name": "Corporate Identity Provider", "aliases": ["Corporate IdP via IAS [PROPOSED]"]},
+        {"name": "SAP BTP Applications", "aliases": ["SAP BTP Applications - IAM based on SAP Cloud Identity Services", "SAP BTP Applications - IAM based on XSUAA"]}
+      ],
+      "required_terms": ["Authenticate", "Mutual Trust", "XSUAA"],
+      "required_flows": [
+        {"from": "User", "to": "Mobile/Desktop Application Clients"}
+      ],
+      "forbidden_terms": ["SAML required for all BTP accounts"]
+    },
+    {
+      "name": "02--IPS-Provisioning",
+      "purpose": "Identity lifecycle and provisioning pattern",
+      "level": "L2",
+      "template": "ac_RA0019_IdentityLifecycle.drawio",
+      "source_url": "https://github.com/SAP/architecture-center/blob/dev/docs/ref-arch/RA0019/2-identity-lifecycle/drawio/public-sap-identity-lifecycle-sd.drawio",
+      "relabels": [
+        {
+          "match": "Recommended identity lifecycle flows and tools for SAP landscapes",
+          "replacement": "IPS provisioning route [PROPOSED]"
+        },
+        {
+          "match": "Third party identity provider / identity management",
+          "replacement": "Customer identity source [CLIENT CONFIRM]"
+        }
+      ],
+      "required_nodes": [
+        "Identity Provisioning",
+        "Identity Directory",
+        "SAP SuccessFactors",
+        "SAP Fieldglass",
+        {"name": "Customer identity source", "aliases": ["Customer identity source [CLIENT CONFIRM]"]}
+      ],
+      "required_terms": ["Identity Lifecycle", "Data Flow", "Customer-managed Identity Lifecycle"],
+      "required_flows": [
+        {"from": "User", "to": "Mobile/Desktop Application Clients"}
+      ],
+      "forbidden_terms": ["SCIM API v1 universally decommissioned"]
+    }
+  ]
+}

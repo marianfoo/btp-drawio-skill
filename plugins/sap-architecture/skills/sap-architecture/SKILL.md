@@ -1,6 +1,6 @@
 ---
 name: sap-architecture
-description: Create, edit, or review editable SAP Architecture Center-style draw.io diagrams for SAP BTP, Cloud Foundry, Kyma, ABAP environment, Cloud Connector, SAP S/4HANA, Fiori, SAP Build, Joule, IAM/XSUAA, integration, resiliency, data, and AI-agent landscapes. Use when the requested artifact is an SAP architecture, topology, trust, authentication, authorization, deployment, or solution-flow diagram in `.drawio` format. Produces a template-derived diagram with a pre-authored semantic specification, safe derivative attribution, strict structural-delta validation, pinned-template scoring, rendered visual review, and a machine-readable completion report. Do not use for generic non-SAP flowcharts, or to approve unsupported SAP architecture claims.
+description: Create, edit, or review editable SAP Architecture Center-style draw.io diagrams and multi-page SAP identity architecture packs for SAP BTP, Cloud Foundry, Kyma, ABAP environment, Cloud Connector, SAP S/4HANA, Fiori, SAP Build, Joule, IAM/XSUAA, integration, resiliency, data, and AI-agent landscapes. Use when the requested artifact is an SAP architecture, topology, trust, authentication, authorization, deployment, provisioning, or solution-flow diagram in `.drawio` format. Produces template-derived canonical diagrams with semantic and claim-state controls, safe derivative attribution, strict structural-delta validation, rendered visual review, and machine-readable delivery or export manifests. Do not use for generic non-SAP flowcharts, or to approve unsupported SAP architecture claims.
 ---
 
 # SAP Architecture Diagram
@@ -12,6 +12,7 @@ Produce an editable SAP-style `.drawio` diagram without confusing visual fidelit
 - For SAP security, client deliverables, KDDs, proposals, or evidence-bearing architecture claims, run `sap-deliverable-start` first. Use this skill only after the content is approved or explicitly staged as an assumption.
 - This skill authors and verifies the diagram artifact. It does not replace source review, SAP evidence gates, the SAP risk boundary, or Gerard's Marc review gate.
 - Start from a bundled SAP template. Use `render_semantic.py` only when the template selector cannot represent the requested architecture family.
+- For an identity request spanning landscape, IAS authentication/broker trust, and IPS lifecycle, use the identity-pack route below instead of forcing all concerns onto one page.
 - Remove or replace source-specific QR codes, reference identifiers, and official links. A modified diagram must say that it is derived and not an official SAP Reference Architecture.
 - Never claim `ready`, `pixel-polished`, or visually verified without a passing `gate-report.json` bound to a passing visual-review record.
 
@@ -26,6 +27,8 @@ python3 "$SKILL_DIR/scripts/<script>.py" ...
 Do not assume `.claude/skills`, `.codex/skills`, the repository root, or the caller's current directory.
 
 ## Required Workflow
+
+For a single-page artifact, follow steps 1–7. For a multi-page identity pack, follow **Identity Pack Workflow** first, then apply steps 5–6 independently to every emitted page.
 
 ### 1. Lock semantics before selecting a template
 
@@ -136,6 +139,24 @@ Report:
 
 Print a numbered flow narration for the host document. Keep narration outside the canvas.
 
+## Identity Pack Workflow
+
+Read `references/identity-pack-workflow.md`. The default pattern composes three official Architecture Center pages without generating mxGraph geometry:
+
+```bash
+python3 "$SKILL_DIR/scripts/check_currentness.py" --live
+python3 "$SKILL_DIR/scripts/scaffold_identity_pack.py" --out <name>.drawio
+python3 "$SKILL_DIR/scripts/validate_semantics.py" <name>.drawio <name>.spec.json
+python3 "$SKILL_DIR/scripts/provenance.py" <name>.drawio --audit --strict
+python3 "$SKILL_DIR/scripts/export_pack.py" <name>.drawio \
+  --spec <name>.spec.json --targets <name>.targets.json \
+  --out-dir <name>-exports --emit-page-drawio
+```
+
+Keep the multi-page `.drawio` canonical. SVG, PNG, PDF, and emitted page files are generated derivatives bound by the export manifest. Run `verify_delivery.py` and a real hash-bound visual review on each emitted page before claiming the pack passes.
+
+Use `build_sequence_draft.py` for structured authentication/provisioning sequences and `build_csv_variation.py` for controlled topology auto-layout. These are draft accelerators only: integrate useful output into a template-derived page and rerun all gates. For exact repeated label changes across the identity pattern, pass `--variation-csv` to `scaffold_identity_pack.py`; every row requires a claim state and its state-specific evidence fields.
+
 ## Stop Conditions
 
 Stop and report the exact gate when:
@@ -154,6 +175,7 @@ Never bypass a stop by lowering the score, deleting a semantic requirement, allo
 ## Reference Routing
 
 - Semantic contract and provenance: `references/semantic-spec.md`, `references/guarded-workflow.md`
+- Identity packs, claim states, exports, and controlled variation: `references/identity-pack-workflow.md`
 - Level selection: `references/levels.md`
 - Layout and styling: `references/layout.md`, `references/palette-and-typography.md`, `references/shapes-and-edges.md`
 - SAP rules: `references/do-and-dont.md`, `references/generation-quality.md`

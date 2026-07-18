@@ -29,6 +29,8 @@ Keep these together during a run:
 
 The `.drawio` file is the editable artifact. The specification and gate report are the audit trail. Cache outputs can remain uncommitted unless the project needs durable evidence.
 
+For multi-page packs, the canonical file remains one `.drawio`. `export_pack.py` creates deterministic per-page SVG, PNG, PDF, optional page `.drawio` files, and CSV/JSON manifests containing page names, source-template pins, and hashes. Treat every export as a derivative; never repair an exported page separately from the canonical pack.
+
 ## Structural Strictness
 
 SAP source templates sometimes contain warnings under the local validator. The final gate compares candidate warnings with the exact pinned source template:

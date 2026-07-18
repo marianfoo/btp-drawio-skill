@@ -1,6 +1,6 @@
 # Semantic Specification
 
-Create the specification before template selection. It is the architecture contract used to stop a visually convincing but wrong diagram from passing.
+Create the specification before template selection. It is the architecture contract used to stop a visually convincing but wrong diagram from passing. Schema version 1 controls a single page. Schema version 2 controls a named multi-page pack and its architecture claims.
 
 ## Schema
 
@@ -63,3 +63,52 @@ When the request changes, update the specification first and then the diagram. A
 4. Add only confirmed legitimate raster hashes to `provenance.allowed_raster_hashes`.
 
 Never allow a hash without inspecting the corresponding rendered image.
+
+## Multi-page Claim Controls
+
+Schema version 2 uses the same page fields under `pages[]`; each page must have an exact `name`. It also requires a pack `status` and a `claims[]` register:
+
+```json
+{
+  "schema_version": 2,
+  "subject": "SAP Identity Architecture Pack",
+  "status": "internal-draft",
+  "claims": [
+    {
+      "id": "ias-capability",
+      "state": "product-capability",
+      "text": "SAP Cloud Identity Services capability used in this pattern.",
+      "source_url": "https://help.sap.com/...",
+      "checked_on": "2026-07-18"
+    },
+    {
+      "id": "ias-broker-route",
+      "state": "proposed-design",
+      "text": "IAS brokers authentication to the corporate identity provider.",
+      "decision_status": "client-confirm"
+    }
+  ],
+  "pages": [
+    {
+      "name": "01--IAS-Proxy-and-BTP-Trust",
+      "level": "L2",
+      "required_nodes": ["Identity Authentication"],
+      "required_flows": [],
+      "required_terms": ["Mutual Trust"],
+      "forbidden_terms": []
+    }
+  ]
+}
+```
+
+Claim states are deliberately non-interchangeable:
+
+| State | Required boundary |
+|---|---|
+| `product-capability` | HTTPS `source_url` plus `checked_on` |
+| `proposed-design` | `decision_status`: `proposed`, `assumption`, or `client-confirm` |
+| `configured-client-state` | An actual client `evidence` reference |
+| `client-confirmation` | A specific `confirmation_needed` statement |
+| `protocol-specific-exception` | `protocol`, narrowly written `scope`, and `source_url` |
+
+Valid pack statuses are `internal-draft`, `external-safe-generic`, and `client-specific-final-candidate`. A passing artifact gate does not upgrade the evidence status.

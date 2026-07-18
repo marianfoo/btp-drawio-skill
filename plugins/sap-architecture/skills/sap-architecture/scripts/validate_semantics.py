@@ -19,6 +19,13 @@ from typing import Any, Iterable
 
 
 LABEL_ATTRS = ("value", "label", "name")
+CLAIM_STATES = {
+    "product-capability",
+    "proposed-design",
+    "configured-client-state",
+    "client-confirmation",
+    "protocol-specific-exception",
+}
 
 
 @dataclass(frozen=True)
@@ -91,17 +98,31 @@ def label_matches(label: str, candidates: Iterable[str]) -> bool:
     return False
 
 
-def first_diagram_scope(root: ET.Element) -> ET.Element:
+def diagram_scope(root: ET.Element, page: str | int | None = None) -> ET.Element:
     if root.tag == "mxfile":
-        diagram = root.find("diagram")
-        if diagram is not None:
-            return diagram
+        diagrams = root.findall("diagram")
+        if page is None:
+            if diagrams:
+                return diagrams[0]
+        elif isinstance(page, int):
+            if 0 <= page < len(diagrams):
+                return diagrams[page]
+        else:
+            match = next((diagram for diagram in diagrams if diagram.get("name") == page), None)
+            if match is not None:
+                return match
+        raise ValueError(f"diagram page not found: {page!r}")
     return root
 
 
-def extract_semantics(path: Path) -> DiagramSemantics:
+def first_diagram_scope(root: ET.Element) -> ET.Element:
+    """Backward-compatible alias for callers that intentionally inspect page one."""
+    return diagram_scope(root)
+
+
+def extract_semantics(path: Path, page: str | int | None = None) -> DiagramSemantics:
     root = ET.parse(path).getroot()
-    scope = first_diagram_scope(root)
+    scope = diagram_scope(root, page)
     labels_by_id: dict[str, str] = {}
     cell_by_id: dict[str, ET.Element] = {}
 
@@ -180,15 +201,82 @@ def load_spec(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("semantic specification must be a JSON object")
-    if data.get("schema_version") != 1:
-        raise ValueError("semantic specification requires schema_version 1")
+    if data.get("schema_version") not in {1, 2}:
+        raise ValueError("semantic specification requires schema_version 1 or 2")
     return data
 
 
-def validate_semantics(drawio: Path, spec_path: Path) -> SemanticReport:
-    spec = load_spec(spec_path)
-    diagram = extract_semantics(drawio)
-    report = SemanticReport()
+def validate_claims(spec: dict[str, Any], report: SemanticReport) -> None:
+    claims = spec.get("claims", [])
+    if not isinstance(claims, list):
+        raise ValueError("claims must be a list")
+    seen: set[str] = set()
+    for index, claim in enumerate(claims):
+        if not isinstance(claim, dict):
+            raise ValueError(f"claims[{index}] must be an object")
+        claim_id = str(claim.get("id", "")).strip()
+        state = str(claim.get("state", "")).strip()
+        text = str(claim.get("text", "")).strip()
+        if not claim_id or claim_id in seen:
+            report.errors.append(SemanticIssue("invalid-claim-id", f"claim {index + 1} requires a unique id"))
+            continue
+        seen.add(claim_id)
+        if not text:
+            report.errors.append(SemanticIssue("missing-claim-text", f"claim {claim_id} requires text"))
+        if state not in CLAIM_STATES:
+            report.errors.append(SemanticIssue("invalid-claim-state", f"claim {claim_id} has invalid state: {state}"))
+            continue
+        if state == "product-capability":
+            if not str(claim.get("source_url", "")).startswith("https://") or not str(claim.get("checked_on", "")).strip():
+                report.errors.append(
+                    SemanticIssue(
+                        "unverified-product-capability",
+                        f"claim {claim_id} requires source_url and checked_on",
+                    )
+                )
+        elif state == "proposed-design":
+            if claim.get("decision_status") not in {"proposed", "assumption", "client-confirm"}:
+                report.errors.append(
+                    SemanticIssue(
+                        "unbounded-proposed-design",
+                        f"claim {claim_id} requires decision_status proposed, assumption, or client-confirm",
+                    )
+                )
+        elif state == "configured-client-state":
+            if not str(claim.get("evidence", "")).strip():
+                report.errors.append(
+                    SemanticIssue(
+                        "unproven-client-state",
+                        f"claim {claim_id} requires a client evidence reference",
+                    )
+                )
+        elif state == "client-confirmation":
+            if not str(claim.get("confirmation_needed", "")).strip():
+                report.errors.append(
+                    SemanticIssue(
+                        "missing-confirmation-boundary",
+                        f"claim {claim_id} requires confirmation_needed",
+                    )
+                )
+        elif state == "protocol-specific-exception":
+            required = ("protocol", "scope", "source_url")
+            missing = [key for key in required if not str(claim.get(key, "")).strip()]
+            if missing:
+                report.errors.append(
+                    SemanticIssue(
+                        "unscoped-protocol-exception",
+                        f"claim {claim_id} requires {', '.join(missing)}",
+                    )
+                )
+
+
+def validate_page_spec(
+    diagram: DiagramSemantics,
+    spec: dict[str, Any],
+    report: SemanticReport,
+    *,
+    key_prefix: str = "",
+) -> None:
 
     def require_labels(key: str, values: Any, pool: list[str]) -> None:
         if values is None:
@@ -203,7 +291,7 @@ def validate_semantics(drawio: Path, spec_path: Path) -> SemanticReport:
                 report.errors.append(SemanticIssue(f"missing-{key}", f"missing required {key[:-1]}: {wanted[0]}"))
             else:
                 matched.append(actual)
-        report.matched[key] = matched
+        report.matched[f"{key_prefix}{key}"] = matched
 
     require_labels("required_nodes", spec.get("required_nodes", []), diagram.node_labels)
     require_labels("required_zones", spec.get("required_zones", []), diagram.zone_labels)
@@ -241,11 +329,52 @@ def validate_semantics(drawio: Path, spec_path: Path) -> SemanticReport:
             report.errors.append(
                 SemanticIssue("missing-flow", f"missing required flow: {source_aliases[0]} {direction} {target_aliases[0]}")
             )
-    report.matched["required_flows"] = matched_flows
+    report.matched[f"{key_prefix}required_flows"] = matched_flows
 
     expected_level = spec.get("level")
     if expected_level and expected_level not in {"L0", "L1", "L2"}:
         report.warnings.append(SemanticIssue("unknown-level", f"non-standard level in specification: {expected_level}"))
+
+
+def validate_semantics(drawio: Path, spec_path: Path) -> SemanticReport:
+    spec = load_spec(spec_path)
+    report = SemanticReport()
+    if spec.get("schema_version") == 1:
+        validate_page_spec(extract_semantics(drawio), spec, report)
+        return report
+
+    status = spec.get("status")
+    if status not in {"internal-draft", "external-safe-generic", "client-specific-final-candidate"}:
+        report.errors.append(SemanticIssue("invalid-pack-status", f"invalid pack status: {status}"))
+    validate_claims(spec, report)
+    pages = spec.get("pages")
+    if not isinstance(pages, list) or not pages:
+        raise ValueError("schema_version 2 requires a non-empty pages list")
+    root = ET.parse(drawio).getroot()
+    actual_names = [diagram.get("name") or "" for diagram in root.findall("diagram")] if root.tag == "mxfile" else [""]
+    expected_names: list[str] = []
+    for index, page_spec in enumerate(pages):
+        if not isinstance(page_spec, dict):
+            raise ValueError(f"pages[{index}] must be an object")
+        page_name = str(page_spec.get("name", "")).strip()
+        if not page_name:
+            raise ValueError(f"pages[{index}] requires name")
+        if page_name in expected_names:
+            raise ValueError(f"duplicate page specification: {page_name}")
+        expected_names.append(page_name)
+        try:
+            semantics = extract_semantics(drawio, page_name)
+        except ValueError:
+            report.errors.append(SemanticIssue("missing-page", f"missing required diagram page: {page_name}"))
+            continue
+        validate_page_spec(semantics, page_spec, report, key_prefix=f"pages[{page_name}].")
+    unexpected = [name for name in actual_names if name not in expected_names]
+    missing_specs = [name for name in expected_names if name not in actual_names]
+    for name in unexpected:
+        report.warnings.append(SemanticIssue("uncontrolled-page", f"diagram page has no semantic specification: {name}"))
+    for name in missing_specs:
+        if not any(issue.code == "missing-page" and name in issue.message for issue in report.errors):
+            report.errors.append(SemanticIssue("missing-page", f"missing required diagram page: {name}"))
     return report
 
 

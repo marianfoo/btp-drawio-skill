@@ -92,6 +92,22 @@ def first_graph_model(root: ET.Element) -> ET.Element:
     return graph
 
 
+def diagram_graphs(root: ET.Element) -> list[tuple[ET.Element | None, ET.Element]]:
+    """Return every uncompressed page while retaining its diagram wrapper."""
+    if root.tag == "mxfile":
+        result = [
+            (diagram, graph)
+            for diagram in root.findall("diagram")
+            if (graph := diagram.find("mxGraphModel")) is not None
+        ]
+    else:
+        graph = root if root.tag == "mxGraphModel" else root.find(".//mxGraphModel")
+        result = [(None, graph)] if graph is not None else []
+    if not result:
+        raise ValueError("drawio file has no uncompressed mxGraphModel")
+    return result
+
+
 def remove_element(root: ET.Element, target: ET.Element) -> None:
     for parent in root.iter():
         for child in list(parent):
@@ -154,7 +170,6 @@ def top_level_bounds(model_root: ET.Element, layer_id: str) -> tuple[float, floa
 
 
 def sanitize_tree(root: ET.Element, *, source_template: str, source_url: str) -> list[str]:
-    already_derivative = root.get("data-guarded-derivative") == "true"
     removed_ids: list[str] = []
     for elem in list(root.iter()):
         if source_specific_element(elem):
@@ -183,57 +198,63 @@ def sanitize_tree(root: ET.Element, *, source_template: str, source_url: str) ->
     root.set("data-guarded-source-url", source_url)
     root.set("data-guarded-provenance-version", "1")
 
-    graph = first_graph_model(root)
-    model_root = graph.find("root")
-    if model_root is None:
-        raise ValueError("mxGraphModel has no root")
-    for cell in list(model_root.iter("mxCell")):
-        if cell.get("id") == DISCLAIMER_ID:
-            remove_element(model_root, cell)
+    for diagram, graph in diagram_graphs(root):
+        page_template = (diagram.get("data-guarded-source-template") if diagram is not None else None) or source_template
+        page_url = (diagram.get("data-guarded-source-url") if diagram is not None else None) or source_url
+        if diagram is not None:
+            diagram.set("data-guarded-source-template", page_template)
+            diagram.set("data-guarded-source-url", page_url)
+        model_root = graph.find("root")
+        if model_root is None:
+            raise ValueError("mxGraphModel has no root")
+        had_disclaimer = any(cell.get("id") == DISCLAIMER_ID for cell in model_root.iter("mxCell"))
+        for cell in list(model_root.iter("mxCell")):
+            if cell.get("id") == DISCLAIMER_ID:
+                remove_element(model_root, cell)
 
-    try:
-        page_width = float(graph.get("pageWidth") or 1169)
-        page_height = float(graph.get("pageHeight") or 827)
-    except ValueError as exc:
-        raise ValueError("invalid page dimensions") from exc
-    new_height = page_height if already_derivative else page_height + 40
-    graph.set("pageHeight", str(int(new_height) if new_height.is_integer() else new_height))
-    layer_id = drawing_layer_id(model_root)
-    bounds = top_level_bounds(model_root, layer_id)
-    if bounds is None:
-        disclaimer_x = 20.0
-        disclaimer_y = page_height + 10
-        disclaimer_width = max(100.0, page_width - 40)
-    else:
-        min_x, _min_y, max_x, max_y = bounds
-        disclaimer_x = min_x + 20
-        disclaimer_y = max_y + 10
-        disclaimer_width = max(100.0, max_x - min_x - 40)
-    disclaimer = ET.SubElement(
-        model_root,
-        "mxCell",
-        {
-            "id": DISCLAIMER_ID,
-            "value": f"{DISCLAIMER_PREFIX} Source template: {source_template}. Source: {source_url}",
-            "style": (
-                "text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;"
-                "whiteSpace=wrap;fontFamily=Helvetica;fontSize=8;fontColor=#475E75;"
-            ),
-            "vertex": "1",
-            "parent": layer_id,
-        },
-    )
-    ET.SubElement(
-        disclaimer,
-        "mxGeometry",
-        {
-            "x": str(int(disclaimer_x) if disclaimer_x.is_integer() else disclaimer_x),
-            "y": str(int(disclaimer_y) if disclaimer_y.is_integer() else disclaimer_y),
-            "width": str(int(disclaimer_width) if disclaimer_width.is_integer() else disclaimer_width),
-            "height": "20",
-            "as": "geometry",
-        },
-    )
+        try:
+            page_width = float(graph.get("pageWidth") or 1169)
+            page_height = float(graph.get("pageHeight") or 827)
+        except ValueError as exc:
+            raise ValueError("invalid page dimensions") from exc
+        new_height = page_height if had_disclaimer else page_height + 40
+        graph.set("pageHeight", str(int(new_height) if new_height.is_integer() else new_height))
+        layer_id = drawing_layer_id(model_root)
+        bounds = top_level_bounds(model_root, layer_id)
+        if bounds is None:
+            disclaimer_x = 20.0
+            disclaimer_y = page_height + 10
+            disclaimer_width = max(100.0, page_width - 40)
+        else:
+            min_x, _min_y, max_x, max_y = bounds
+            disclaimer_x = min_x + 20
+            disclaimer_y = max_y + 10
+            disclaimer_width = max(100.0, max_x - min_x - 40)
+        disclaimer = ET.SubElement(
+            model_root,
+            "mxCell",
+            {
+                "id": DISCLAIMER_ID,
+                "value": f"{DISCLAIMER_PREFIX} Source template: {page_template}. Source: {page_url}",
+                "style": (
+                    "text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;"
+                    "whiteSpace=wrap;fontFamily=Helvetica;fontSize=8;fontColor=#475E75;"
+                ),
+                "vertex": "1",
+                "parent": layer_id,
+            },
+        )
+        ET.SubElement(
+            disclaimer,
+            "mxGeometry",
+            {
+                "x": str(int(disclaimer_x) if disclaimer_x.is_integer() else disclaimer_x),
+                "y": str(int(disclaimer_y) if disclaimer_y.is_integer() else disclaimer_y),
+                "width": str(int(disclaimer_width) if disclaimer_width.is_integer() else disclaimer_width),
+                "height": "20",
+                "as": "geometry",
+            },
+        )
     return removed_ids
 
 
@@ -245,13 +266,27 @@ def audit_tree(root: ET.Element, *, allowed_raster_hashes: set[str] | None = Non
     if not root.get("data-guarded-source-template") or not root.get("data-guarded-source-url"):
         report.errors.append(ProvenanceIssue("missing-source-metadata", "source template and source URL metadata are required"))
 
-    disclaimer_found = False
+    disclaimer_pages: set[int] = set()
+    page_by_element: dict[int, int] = {}
+    graphs = diagram_graphs(root)
+    for page_index, (diagram, _graph) in enumerate(graphs, start=1):
+        scope = diagram if diagram is not None else root
+        for elem in scope.iter():
+            page_by_element[id(elem)] = page_index
+        if len(graphs) > 1 and diagram is not None:
+            if not diagram.get("data-guarded-source-template") or not diagram.get("data-guarded-source-url"):
+                report.errors.append(
+                    ProvenanceIssue(
+                        "missing-page-source-metadata",
+                        f"diagram page {page_index} requires source template and URL metadata",
+                    )
+                )
     for elem in root.iter():
         elem_id = elem.get("id") or ""
         labels = " ".join(elem.get(attr) or "" for attr in ("value", "label", "name"))
         visible = clean_label(labels)
         if elem_id == DISCLAIMER_ID and visible.startswith(DISCLAIMER_PREFIX):
-            disclaimer_found = True
+            disclaimer_pages.add(page_by_element.get(id(elem), 1))
         elif OFFICIAL_PATTERN.search(visible):
             report.errors.append(ProvenanceIssue("source-identifier", f"source-specific identifier remains: {visible[:120]}", elem_id))
         for attr in ("link", "href", "tooltip"):
@@ -270,8 +305,14 @@ def audit_tree(root: ET.Element, *, allowed_raster_hashes: set[str] | None = Non
                             elem_id,
                         )
                     )
-    if not disclaimer_found:
-        report.errors.append(ProvenanceIssue("missing-visible-disclaimer", "visible derivative disclaimer is required"))
+    for page_index in range(1, len(graphs) + 1):
+        if page_index not in disclaimer_pages:
+            report.errors.append(
+                ProvenanceIssue(
+                    "missing-visible-disclaimer",
+                    f"visible derivative disclaimer is required on diagram page {page_index}",
+                )
+            )
     report.candidate_raster_hashes = sorted(set(report.candidate_raster_hashes))
     return report
 

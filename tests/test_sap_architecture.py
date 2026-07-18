@@ -9,6 +9,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from statistics import median
 from pathlib import Path
+import datetime as dt
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +41,11 @@ validate = load_script("validate")
 validate_semantics = load_script("validate_semantics")
 provenance = load_script("provenance")
 verify_delivery = load_script("verify_delivery")
+check_currentness = load_script("check_currentness")
+build_sequence_draft = load_script("build_sequence_draft")
+build_csv_variation = load_script("build_csv_variation")
+scaffold_identity_pack = load_script("scaffold_identity_pack")
+export_pack = load_script("export_pack")
 
 
 class CompareTests(unittest.TestCase):
@@ -547,6 +553,49 @@ class GuardedSemanticTests(unittest.TestCase):
             )
         self.assertTrue(any(issue.code == "missing-required_nodes" for issue in report.errors))
 
+    def test_multipage_claim_controls_reject_unproven_client_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            drawio, _ = self.write_case(tmp)
+            root = ET.parse(drawio).getroot()
+            first = root.find("diagram")
+            self.assertIsNotNone(first)
+            first.set("name", "Architecture")
+            root.append(ET.fromstring(ET.tostring(first, encoding="unicode")))
+            root.findall("diagram")[1].set("name", "Provisioning")
+            ET.ElementTree(root).write(drawio, encoding="unicode")
+            spec = Path(tmp) / "pack.spec.json"
+            page_contract = {
+                "level": "L2",
+                "required_zones": ["SAP BTP"],
+                "required_nodes": ["CAP Application", "SAP Destination service"],
+                "required_flows": [{"from": "CAP Application", "to": "SAP Destination service"}],
+                "required_terms": ["OData/REST"],
+                "forbidden_terms": [],
+            }
+            spec.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 2,
+                        "subject": "Controlled pack",
+                        "status": "internal-draft",
+                        "claims": [
+                            {
+                                "id": "client-route",
+                                "state": "configured-client-state",
+                                "text": "This route is configured.",
+                            }
+                        ],
+                        "pages": [
+                            {"name": "Architecture", **page_contract},
+                            {"name": "Provisioning", **page_contract},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = validate_semantics.validate_semantics(drawio, spec)
+        self.assertTrue(any(issue.code == "unproven-client-state" for issue in report.errors))
+
 
 class ProvenanceTests(unittest.TestCase):
     SOURCE_DIAGRAM = """<mxfile>
@@ -634,6 +683,123 @@ class ProvenanceTests(unittest.TestCase):
         self.assertIsNotNone(geometry)
         self.assertLess(float(geometry.get("x") or 0), 0)
         self.assertLess(float(geometry.get("y") or 0), 0)
+
+    def test_multipage_sanitizer_marks_and_audits_every_page_idempotently(self) -> None:
+        root = ET.fromstring(self.SOURCE_DIAGRAM)
+        second = ET.fromstring(ET.tostring(root.find("diagram"), encoding="unicode"))
+        second.set("id", "second")
+        second.set("name", "second")
+        root.append(second)
+        provenance.sanitize_tree(
+            root,
+            source_template="template.drawio",
+            source_url="https://example.invalid/template",
+        )
+        heights = [diagram.find("mxGraphModel").get("pageHeight") for diagram in root.findall("diagram")]
+        provenance.sanitize_tree(
+            root,
+            source_template="template.drawio",
+            source_url="https://example.invalid/template",
+        )
+        disclaimers = [
+            [cell for cell in diagram.iter("mxCell") if cell.get("id") == "guarded-provenance"]
+            for diagram in root.findall("diagram")
+        ]
+        self.assertEqual([1, 1], [len(items) for items in disclaimers])
+        self.assertEqual(heights, [diagram.find("mxGraphModel").get("pageHeight") for diagram in root.findall("diagram")])
+        self.assertEqual([], provenance.audit_tree(root).errors)
+
+
+class IdentityPackTests(unittest.TestCase):
+    def test_default_pattern_scaffolds_three_guarded_semantic_pages(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "identity.drawio"
+            spec = out.with_suffix(".spec.json")
+            targets = out.with_suffix(".targets.json")
+            scaffold_identity_pack.compose(
+                scaffold_identity_pack.load_pattern(scaffold_identity_pack.DEFAULT_PATTERN),
+                [],
+                output=out,
+                spec_output=spec,
+                targets_output=targets,
+            )
+            root = ET.parse(out).getroot()
+            report = validate_semantics.validate_semantics(out, spec)
+            audit = provenance.audit_tree(root)
+            target_data = json.loads(targets.read_text(encoding="utf-8"))
+        self.assertEqual(
+            ["00--Identity-Landscape", "01--IAS-Proxy-and-BTP-Trust", "02--IPS-Provisioning"],
+            [diagram.get("name") for diagram in root.findall("diagram")],
+        )
+        self.assertTrue(all(diagram.get("data-guarded-source-template") for diagram in root.findall("diagram")))
+        self.assertEqual([], report.errors)
+        self.assertEqual([], audit.errors)
+        self.assertEqual(3, len(target_data["pages"]))
+
+    def test_currentness_flags_stale_release_and_passes_current_control(self) -> None:
+        control = json.loads((SKILL_DIR / "assets/currentness.json").read_text(encoding="utf-8"))
+        current = check_currentness.check(control, as_of=dt.date(2026, 7, 18), live=False)
+        stale = check_currentness.check(control, as_of=dt.date(2027, 1, 1), live=False)
+        self.assertTrue(current["ok"])
+        self.assertFalse(stale["ok"])
+        self.assertTrue(any("stale" in item["status"] for item in stale["upstreams"]))
+
+    def test_sequence_draft_enforces_claim_state_boundaries(self) -> None:
+        payload = {
+            "schema_version": 1,
+            "status": "draft",
+            "participants": [{"id": "user", "label": "User"}, {"id": "ias", "label": "IAS"}],
+            "messages": [
+                {
+                    "from": "user",
+                    "to": "ias",
+                    "label": "Authenticate",
+                    "protocol": "OIDC",
+                    "state": "proposed-design",
+                    "decision_status": "client-confirm",
+                }
+            ],
+        }
+        output = build_sequence_draft.build(payload)
+        self.assertIn("sequenceDiagram", output)
+        self.assertIn("user->>ias: OIDC: Authenticate", output)
+        del payload["messages"][0]["decision_status"]
+        with self.assertRaisesRegex(ValueError, "requires decision_status"):
+            build_sequence_draft.build(payload)
+
+    def test_csv_variation_enforces_client_evidence_and_emits_drawio_directives(self) -> None:
+        rows = [
+            {
+                "id": "ias",
+                "label": "Identity Authentication",
+                "connect_to": "",
+                "protocol": "OIDC",
+                "claim_state": "configured-client-state",
+                "evidence": "tenant-export-2026-07-18",
+            },
+            {
+                "id": "app",
+                "label": "SAP BTP Application",
+                "connect_to": "ias",
+                "protocol": "OIDC",
+                "claim_state": "proposed-design",
+                "decision_status": "client-confirm",
+            },
+        ]
+        output = build_csv_variation.build(rows)
+        self.assertIn('"invert":true', output)
+        self.assertIn('"label":"protocol"', output)
+        self.assertIn("Identity Authentication", output)
+        rows[0]["evidence"] = ""
+        with self.assertRaisesRegex(ValueError, "requires a client evidence reference"):
+            build_csv_variation.build(rows)
+
+    def test_page_export_spec_preserves_semantic_contract(self) -> None:
+        pack = scaffold_identity_pack.load_pattern(scaffold_identity_pack.DEFAULT_PATTERN)
+        spec = {"pages": pack["pages"], "provenance": {"allowed_raster_hashes": []}}
+        page = export_pack.page_spec(spec, "01--IAS-Proxy-and-BTP-Trust")
+        self.assertEqual(1, page["schema_version"])
+        self.assertIn("Identity Authentication", page["required_nodes"])
 
 
 class GuardedReviewTests(unittest.TestCase):
