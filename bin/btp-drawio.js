@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { checkPython, missingPythonMessage, packageRoot, runPythonInherit, scriptPath } from "../lib/python-tools.js";
 import { JS_COMMANDS, runJsCommand, shouldUseJsEngine } from "../src/cli.js";
 
@@ -9,6 +10,10 @@ const COMMANDS = new Map([
   ["select", "select_reference.py"],
   ["semantic", "render_semantic.py"],
   ["validate", "validate.py"],
+  ["validate-semantics", "validate_semantics.py"],
+  ["provenance", "provenance.py"],
+  ["verify-delivery", "verify_delivery.py"],
+  ["record-visual-review", "record_visual_review.py"],
   ["autofix", "autofix.py"],
   ["score", "score_corpus.py"],
   ["compare", "compare.py"],
@@ -31,6 +36,8 @@ Usage:
   btp-drawio scaffold "<request>" --out diagram.drawio
   btp-drawio semantic "<request>" --out diagram.drawio
   btp-drawio validate diagram.drawio
+  btp-drawio validate-semantics diagram.drawio diagram.spec.json
+  btp-drawio verify-delivery diagram.drawio diagram.spec.json --target template.drawio --out-dir .cache/review
   btp-drawio score --min-score 90 diagram.drawio
   btp-drawio render diagram.drawio -o diagram.png
   btp-drawio extract-icon "Destination Service" --id dest
@@ -40,6 +47,10 @@ Commands:
   scaffold          Copy the closest SAP reference template.
   semantic          Render a deterministic semantic fallback diagram.
   validate          Run structural/style validation.
+  validate-semantics  Validate required nodes, terms, and directed flows.
+  provenance        Mark/audit derivative provenance and source identifiers.
+  verify-delivery   Run the guarded final delivery gate.
+  record-visual-review  Record a hash-bound rendered-image review.
   autofix           Apply mechanical fixes.
   score             Score against the bundled corpus.
   compare           Compare two .drawio files.
@@ -72,20 +83,34 @@ function printDoctor() {
     console.log(`python      : missing (${missingPythonMessage()})`);
   }
 
-  for (const script of ["scaffold_diagram.py", "render_semantic.py", "validate.py", "score_corpus.py"]) {
+  for (const script of [
+    "scaffold_diagram.py",
+    "render_semantic.py",
+    "validate.py",
+    "validate_semantics.py",
+    "provenance.py",
+    "verify_delivery.py",
+    "record_visual_review.py",
+    "score_corpus.py"
+  ]) {
     const path = scriptPath(script);
-    console.log(`${script.padEnd(19)}: ${existsSync(path) ? "ok" : "missing"}`);
+    console.log(`${script.padEnd(25)}: ${existsSync(path) ? "ok" : "missing"}`);
     if (!existsSync(path)) ok = false;
   }
 
-  const drawioProbe = spawnSync(process.env.DRAWIO_CLI || "drawio", ["--version"], {
+  const macDrawio = "/Applications/draw.io.app/Contents/MacOS/draw.io";
+  const localDrawio = join(packageRoot, ".cache", "drawio-runtime", "draw.io.app", "Contents", "MacOS", "draw.io");
+  const drawioCommand = process.env.DRAWIO_CLI
+    || (existsSync(macDrawio) ? macDrawio : undefined)
+    || (existsSync(localDrawio) ? localDrawio : "drawio");
+  const drawioProbe = spawnSync(drawioCommand, ["--version"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"]
   });
   if (drawioProbe.status === 0) {
     console.log(`draw.io CLI : ${(drawioProbe.stdout || drawioProbe.stderr).trim() || "ok"}`);
   } else {
-    console.log("draw.io CLI : not on PATH (render.py can still find the macOS app or use DRAWIO_CLI)");
+    console.log("draw.io CLI : missing (draft tools work; guarded completion remains blocked)");
   }
 
   return ok ? 0 : 1;

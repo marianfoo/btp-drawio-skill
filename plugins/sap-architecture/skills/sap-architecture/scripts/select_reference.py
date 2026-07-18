@@ -80,6 +80,7 @@ SCENARIOS = [
     {
         "name": "business-data-cloud",
         "query": {"bdc", "business", "data", "databricks", "snowflake", "hana", "datasphere", "analytics", "bw"},
+        "requires_any": {"bdc", "data", "databricks", "snowflake", "hana", "datasphere", "analytics", "bw"},
         "reference": {"bdc", "businessdatacloud", "databricks", "hyperscalerdata", "dataintegration"},
         "boost": 15,
     },
@@ -122,6 +123,7 @@ SCENARIOS = [
     {
         "name": "federated-ml",
         "query": {"federated", "ml", "machine", "learning", "training", "model", "models", "aicore", "ai"},
+        "requires_any": {"ml", "machine", "learning", "training", "model", "models", "aicore", "ai"},
         "reference": {"federated", "ml", "machine", "learning", "aicore", "ai"},
         "boost": 22,
     },
@@ -243,6 +245,27 @@ def tokens(text: str) -> set[str]:
     return out
 
 
+EXCLUSION_CLAUSE = re.compile(
+    r"\b(?:exclude(?:s|d|ing)?|without|omit(?:s|ted|ting)?|"
+    r"do\s+not\s+include|don't\s+include|must\s+not\s+include|no)\b[^.;\n]*",
+    flags=re.I,
+)
+EXCLUSION_DIRECTIVES = {
+    "do", "don", "exclude", "excluded", "excludes", "excluding", "include",
+    "must", "no", "not", "omit", "omits", "omitted", "omitting", "without",
+}
+
+
+def query_signals(query: str) -> tuple[str, set[str]]:
+    """Separate positive request text from explicit exclusion clauses."""
+    clauses = EXCLUSION_CLAUSE.findall(query)
+    positive_query = EXCLUSION_CLAUSE.sub(" ", query)
+    excluded: set[str] = set()
+    for clause in clauses:
+        excluded.update(tokens(clause) - EXCLUSION_DIRECTIVES)
+    return positive_query, excluded
+
+
 def drawio_text(path: Path) -> str:
     raw = path.read_text(encoding="utf-8", errors="ignore")
     parts = [path.stem]
@@ -298,7 +321,8 @@ def explicit_family(query: str) -> str | None:
 
 
 def score(path: Path, query: str) -> Candidate:
-    q_tokens = tokens(query)
+    positive_query, excluded_tokens = query_signals(query)
+    q_tokens = tokens(positive_query)
     metadata = template_metadata(path)
     doc_text = drawio_text(path)
     meta_text = metadata_search_text(path, metadata)
@@ -332,14 +356,14 @@ def score(path: Path, query: str) -> Candidate:
         value += boost
         reasons.append("metadata match: " + ", ".join(meta_hits[:8]) + f" (+{int(boost)})")
 
-    alias_hits = phrase_hits(query, metadata.get("aliases", []) if isinstance(metadata.get("aliases"), list) else [])
+    alias_hits = phrase_hits(positive_query, metadata.get("aliases", []) if isinstance(metadata.get("aliases"), list) else [])
     if alias_hits:
         boost = min(30.0, 12.0 + (len(alias_hits) - 1) * 6.0)
         value += boost
         reasons.append("alias phrase match: " + ", ".join(alias_hits[:3]) + f" (+{int(boost)})")
 
     title = metadata.get("title")
-    if isinstance(title, str) and phrase_hits(query, [title]):
+    if isinstance(title, str) and phrase_hits(positive_query, [title]):
         value += 22
         reasons.append("metadata title phrase match (+22)")
 
@@ -371,6 +395,9 @@ def score(path: Path, query: str) -> Candidate:
 
     for scenario in SCENARIOS:
         q_hit = q_tokens & scenario["query"]
+        required = scenario.get("requires_any", set())
+        if required and not (q_tokens & required):
+            continue
         r_hit = filename_tokens & scenario["reference"]
         if not r_hit:
             r_hit = m_tokens & scenario["reference"]
@@ -381,7 +408,6 @@ def score(path: Path, query: str) -> Candidate:
 
     strong_query_tags = {
         "devops",
-        "federated",
         "ml",
         "eic",
         "pipo",
@@ -419,7 +445,11 @@ def score(path: Path, query: str) -> Candidate:
     # signal (no explicit "embodied", "procode", "joule studio", etc.), prefer
     # the metadata-flagged "primary" template. This correctly routes the
     # canonical "Agentic AI on SAP BTP" prompt to AgenticAI_root.
-    if metadata.get("primary"):
+    primary_family_signals = {
+        "agent", "agents", "agentic", "mcp", "a2a", "tool", "tools", "joule",
+        "copilot", "cline", "llm", "genai", "generative", "ai",
+    }
+    if metadata.get("primary") and q_tokens & primary_family_signals:
         sub_signals = {
             "embodied", "robotics",  # → EmbodiedAIAgents
             "procode", "developer", "code", "vscode", "ide",  # → GenAI_ProCode
@@ -430,6 +460,17 @@ def score(path: Path, query: str) -> Candidate:
         if not (q_tokens & sub_signals):
             value += 14
             reasons.append("metadata primary-template boost (+14)")
+
+    excluded_meta_hits = sorted(excluded_tokens & (filename_tokens | m_tokens))
+    excluded_visible_hits = sorted(excluded_tokens & (d_tokens - filename_tokens - m_tokens))
+    if excluded_meta_hits:
+        penalty = min(32.0, len(excluded_meta_hits) * 8.0)
+        value -= penalty
+        reasons.append("excluded metadata/filename terms: " + ", ".join(excluded_meta_hits[:8]) + f" (-{int(penalty)})")
+    if excluded_visible_hits:
+        penalty = min(12.0, len(excluded_visible_hits) * 2.0)
+        value -= penalty
+        reasons.append("excluded visible terms: " + ", ".join(excluded_visible_hits[:8]) + f" (-{int(penalty)})")
     if q_tokens & {"xsuaa", "oauth", "oidc", "saml"} and (
         {"authentication", "authn"} & filename_tokens or "cloud" in filename_lower and "identity" in filename_lower
     ):

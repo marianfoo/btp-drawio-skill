@@ -63,11 +63,13 @@ git clone https://github.com/marianfoo/btp-drawio-skill.git
 
 ```markdown
 For any SAP / BTP / on-prem architecture diagram, use the sap-architecture skill at
-<path>/plugins/sap-architecture/skills/sap-architecture/. Follow its SKILL.md 6-step
-workflow and run its scripts (Python 3.8+, no third-party deps): scaffold_diagram.py →
-extract_icon.py → relabel.py → autofix.py → validate.py → score_corpus.py --min-score 90,
-then iterate.py to render, re-score, and fix the worst issue until it matches the SAP reference.
-Never write .drawio XML from scratch — always scaffold from a SAP template first.
+<skill-directory>. Resolve SKILL_DIR to the directory containing SKILL.md; do not assume
+.claude, .codex, or the repository root. Follow the guarded workflow: lock a semantic
+specification → scaffold and pin one SAP template → sanitize derivative provenance → edit
+surgically → run strict semantic/provenance/structural gates → render candidate and target →
+inspect both images → record the hash-bound visual review → rerun verify_delivery.py to PASS.
+Never write .drawio XML from scratch and never preserve source QR/reference identifiers in a
+modified diagram.
 ```
 
 > **Two caveats:** unlike Claude, these tools won't *auto-load* the skill — the instruction file wires it in per project; and the agent needs shell access plus **Python 3.8+** to run the scripts. Use a strong model (see [Recommended models](#recommended-models)) — e.g. Codex with GPT-5.5; small models skip the scaffold/validate discipline.
@@ -103,7 +105,7 @@ Restart Claude — the skill shows up in the Skills panel and auto-invokes when 
 - **Claude Code or Claude Desktop / Claude.ai** — any recent version with skills support.
 - **Python 3.8+ on your PATH** — the diagram engine (template selection, icon extraction, autofix, validation, scoring) is plain Python with zero third-party dependencies. Check with `python3 --version`.
 - **draw.io to open the result** — the [desktop app](https://www.drawio.com/) or [app.diagrams.net](https://app.diagrams.net). Only needed to view/edit; the skill writes the `.drawio` without it.
-- **Optional: the draw.io desktop CLI** — only if you want the skill to export PNG/SVG/PDF for you. Without it you still get the editable `.drawio` and export by hand.
+- **The draw.io desktop CLI for completion** — an editable draft can be created without it, but the guarded final gate requires rendered candidate/reference images and a hash-bound visual review. The renderer is discovered from `$DRAWIO_CLI`, standard install paths, or a verified project-local `.cache/drawio-runtime/draw.io.app`.
 - **No API keys, no `npm install`, no MCP server, no cloud calls** — every icon, template, and script is bundled and runs locally.
 
 ---
@@ -125,7 +127,7 @@ This is **not an easy task.** A good diagram needs multi-step reasoning — pars
 
 ## Use it
 
-Install the skill, then just describe the architecture you want. Claude auto-loads the skill (its trigger phrases are tuned for SAP / BTP / architecture / drawio keywords), picks the closest reference template, drops the right icons, composes the XML, runs autofix + validate + score, and hands you back a ready-to-open `.drawio` plus a numbered flow narration.
+Install the skill, then describe the architecture you want. The skill first converts that request into a semantic contract, selects and pins the closest reference template, marks the result as a derivative, applies surgical edits, and runs semantic, provenance, structural, pinned-template, rendering, and visual-review gates before reporting a final status.
 
 A good first prompt:
 
@@ -145,7 +147,7 @@ For sharper results, see [Write better prompts](#write-better-prompts).
 
 - **It's an authoring assistant, not a one-shot generator.** Budget ~15–30 min per diagram: roughly ⅓ of prompts pass the quality gate clean, the rest need a few surgical edits in draw.io desktop.
 - **No Python → no quality gates.** Claude can still draft a diagram, but the validator/scorer won't run, so you lose the off-palette / bent-arrow / clipped-label checks.
-- **PNG/SVG/PDF export needs the draw.io CLI.** No CLI → export manually from draw.io.
+- **No draw.io CLI means draft status only.** Rendering and visual inspection are mandatory before the guarded workflow can pass.
 - **SAP / BTP / on-prem diagrams only.** It's tuned to the SAP Horizon style and a 71-template corpus, not a general-purpose diagram generator.
 - **`npx btp-drawio-skill` is not the skill** and isn't published to npm yet — it's the raw CLI/MCP wrapper for non-Claude tools. Skip it for Claude.
 
@@ -158,7 +160,7 @@ Give **specific, visual** feedback. Vague ("make it better") gives weak results;
 - "The icons are too large and overlap the card text — shrink them to SAP's 32×32." 
 - "Two arrows cross straight through the BTP box — re-route them around it."
 - "Joule should be its own purple zone next to BTP, not nested inside it."
-- "The title band and SAP footer are missing — add them back from the template."
+- "The visual frame is incomplete — restore the template structure but keep the derivative attribution and remove stale source identifiers."
 - "Use the canonical SAP flow pills (TRUST, Authenticate, OAuth, OData/REST), not invented labels."
 
 Under the hood the agent runs `iterate.py` (render + score + the worst-first fix list) and `render_compare.py` (a side-by-side / overlay / swipe / difference HTML review you can open in a browser). You don't run these yourself — just describe what looks off and let it loop until the diagram matches the SAP reference. See [internals](docs/internals.md) for the loop details.
@@ -211,9 +213,10 @@ Avoid prompts like "make a BTP diagram for our app" unless you want the agent to
 - **100 SAP BTP service icons** (inline SVG data URIs, grey-background-circle variant — the one [SAP mandates](https://github.com/SAP/btp-solution-diagrams/blob/main/guideline/docs/btp_guideline/diagr_comp/icons.md) for diagrams)
 - **448 indexed SAP draw.io starter-kit assets** across 10 bundled libraries: BTP service icons, generic icons, connector presets, area/default shapes, essential shapes, number markers, SAP brand-name text, text elements, and annotation/interface pills
 - **71 pristine reference templates** (Apache-2.0): canonical examples from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams), curated reference architectures from [`SAP/architecture-center`](https://github.com/SAP/architecture-center), and selected external SAP references — covering IAM, Joule, MCP / Agentic AI, multitenant SaaS, DevOps, Private Link, Cloud Connector, Event-Driven Architecture, resiliency, Business Data Cloud, integration, SIEM/SOAR, and SuccessFactors
-- **10 reference sheets** with the exact Horizon hex values, typography hierarchy, shape/edge style strings, layout, and do-and-don't rules — every value cited from the [SAP BTP Solution Diagram Guidelines](https://sap.github.io/btp-solution-diagrams/) or observed in SAP's public corpus
+- **12 reference sheets** covering semantic contracts, guarded provenance, Horizon values, typography, shapes/edges, layout, levels, manual iteration, and scoring methodology
 - **A validator + autofixer** (`validate.py`, `autofix.py`) that catch and mechanically repair bent arrows, clipped labels, off-palette colors, off-grid coordinates, wrong stroke widths, non-Helvetica fonts, and more
 - **A template selector + scoring harness** (`select_reference.py`, `compare.py`, `score_corpus.py`) that picks the nearest SAP template and reports how close a diagram is to the corpus
+- **Guarded completion gates** (`validate_semantics.py`, `provenance.py`, `verify_delivery.py`, `record_visual_review.py`) that prevent a visually similar but request-incomplete diagram, stale official identifiers, new structural warnings, or an uninspected render from passing
 
 Full palette/style rules and the scoring methodology live in [internals](docs/internals.md#design-rules-the-skill-enforces).
 
@@ -221,9 +224,9 @@ Full palette/style rules and the scoring methodology live in [internals](docs/in
 
 ## How it works
 
-The skill is an **authoring assistant**, not a one-shot generator. When triggered it runs a short pipeline: parse your description into a plan → scaffold from the closest SAP reference template (never write XML from scratch) → place official service icons → make surgical label edits → run autofix + validate + score → narrate the flow. The scaffold-then-validate discipline is what keeps the output on-style. From there it can **iterate**: render the diagram to an image, compare it to the SAP reference, and fix the worst issue first — repeat until it matches (see [Nudge it to a good diagram](#nudge-it-to-a-good-diagram)).
+The skill is an **authoring assistant**, not a one-shot generator. Its guarded pipeline is: lock a semantic specification → scaffold and pin the closest SAP reference template → mark and sanitize the derivative → make surgical edits → autofix → validate semantics and provenance → reject new structural warnings → score against the pinned template → render candidate and reference → inspect both → bind the review to the image hashes → narrate the flow. If visual review proves the selected template is an unrelated architecture family, the workflow rejects it and uses the constrained semantic fallback with zero warnings and SAP-likeness at least 90. The four proofs are independent: SAP-like appearance, XML validity, request coverage, and actual pixel review.
 
-See the full 6-step pipeline, the design-rule table, and the validator internals in **[docs/internals.md](docs/internals.md)**.
+See the operational contract in **[`SKILL.md`](plugins/sap-architecture/skills/sap-architecture/SKILL.md)** and the design/scoring internals in **[docs/internals.md](docs/internals.md)**.
 
 ---
 
@@ -239,7 +242,7 @@ See the full 6-step pipeline, the design-rule table, and the validator internals
 ## License & attribution
 
 - **Plugin code** (Python scripts, markdown references, plugin manifests, this README): MIT — see [LICENSE](LICENSE).
-- **Bundled SAP assets** under `plugins/sap-architecture/skills/sap-architecture/assets/` (icon library + reference templates): **Apache-2.0**, © SAP SE or an SAP affiliate company — sourced from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams) and [`SAP/architecture-center`](https://github.com/SAP/architecture-center). See `plugins/sap-architecture/skills/sap-architecture/assets/NOTICE.md` for full attribution.
+- **Bundled SAP assets** under `plugins/sap-architecture/skills/sap-architecture/assets/` (icon library + reference templates): **Apache-2.0**, © SAP SE or an SAP affiliate company — sourced from [`SAP/btp-solution-diagrams`](https://github.com/SAP/btp-solution-diagrams), [`SAP/architecture-center`](https://github.com/SAP/architecture-center), and [`SAP/sap-btp-reference-architectures`](https://github.com/SAP/sap-btp-reference-architectures). See `plugins/sap-architecture/skills/sap-architecture/assets/NOTICE.md` and `plugins/sap-architecture/skills/sap-architecture/assets/source-manifest.json` for attribution, counts, file hashes, and source-revision limitations.
 
 ### Credits & research sources
 

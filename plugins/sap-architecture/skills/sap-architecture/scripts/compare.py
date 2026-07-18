@@ -98,6 +98,8 @@ TOKEN_CANONICAL = {
     "provisoning": "provisioning",
 }
 SAP_REFERENCE_GRID_BASELINE = 0.23
+PROVENANCE_CELL_ID = "guarded-provenance"
+PROVENANCE_FOOTER_HEIGHT = 40
 
 
 # --- Fingerprint ---------------------------------------------------------------
@@ -218,16 +220,20 @@ def fingerprint(path: Path) -> Fingerprint:
     if graph is not None:
         fp.canvas_w = int(graph.get("pageWidth") or graph.get("dx") or 0)
         fp.canvas_h = int(graph.get("pageHeight") or graph.get("dy") or 0)
+        if root.get("data-guarded-derivative") == "true":
+            fp.canvas_h = max(0, fp.canvas_h - PROVENANCE_FOOTER_HEIGHT)
         if not fp.page_background:
             bg = (graph.get("background") or graph.get("pageBackgroundColor") or "").strip().lower()
             if bg:
                 fp.page_background = bg
 
-    cells = scope.findall(".//mxCell")
+    cells = [cell for cell in scope.findall(".//mxCell") if cell.get("id") != PROVENANCE_CELL_ID]
     fp.cells_total = len(cells)
     coords: list[float] = []
     labels: set[str] = set()
     for elem in scope.iter():
+        if elem.get("id") == PROVENANCE_CELL_ID:
+            continue
         for attr in ("name", "label", "value"):
             raw = elem.get(attr)
             if not raw:

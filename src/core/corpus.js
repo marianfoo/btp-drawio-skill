@@ -32,21 +32,28 @@ export const SCENARIOS = [
   { name: "private-connectivity", query: ["private", "privatelink", "link", "connectivity", "connector", "cloudconnector", "scc", "onprem", "premise", "principal", "principalpropagation", "propagation", "odata"], reference: ["privatelink", "private", "connector", "cloudconnector", "connectivity", "odata", "e2b"], boost: 17 },
   { name: "agentic-ai-mcp", query: ["agent", "agents", "agentic", "mcp", "a2a", "tool", "tools", "joule", "copilot", "cline", "llm"], reference: ["agent", "agentic", "mcp", "a2a", "joule", "genai", "generative"], boost: 17 },
   { name: "generative-ai-rag", query: ["genai", "generative", "rag", "retrieval", "semantic", "embedding", "embeddings", "vector", "prompt"], reference: ["genai", "generative", "rag", "semantic", "agent2agent"], boost: 16 },
-  { name: "business-data-cloud", query: ["bdc", "business", "data", "databricks", "snowflake", "hana", "datasphere", "analytics", "bw"], reference: ["bdc", "businessdatacloud", "databricks", "hyperscalerdata", "dataintegration"], boost: 15 },
+  { name: "business-data-cloud", query: ["bdc", "business", "data", "databricks", "snowflake", "hana", "datasphere", "analytics", "bw"], requiresAny: ["bdc", "data", "databricks", "snowflake", "hana", "datasphere", "analytics", "bw"], reference: ["bdc", "businessdatacloud", "databricks", "hyperscalerdata", "dataintegration"], boost: 15 },
   { name: "event-driven-integration", query: ["event", "events", "eventmesh", "eventing", "eda", "queue", "queues", "kafka", "message", "messages"], reference: ["eventdriven", "eda", "event", "integration", "e2b", "a2aintegration", "b2bintegration"], boost: 15 },
   { name: "resiliency", query: ["resiliency", "resilience", "multi", "region", "availability", "az", "failover", "load", "balancer", "disaster"], reference: ["resiliency", "multiregion", "multiaz", "loadbalancer"], boost: 14 },
   { name: "multitenant-saas-cap", query: ["cap", "saas", "tenant", "tenants", "multitenant", "multitenancy", "subscription"], reference: ["susaas", "cap", "multitenant"], boost: 14 },
   { name: "task-workflow-workzone", query: ["task", "tasks", "inbox", "workflow", "workzone", "work", "zone", "launchpad", "process", "automation", "spa"], reference: ["taskcenter", "buildworkzone", "buildprocessautomation"], boost: 14 },
   { name: "devops", query: ["devops", "cicd", "ci", "cd", "pipeline", "pipelines", "transport", "deploy", "deployment"], reference: ["devops"], boost: 20 },
   { name: "security-operations", query: ["siem", "soar", "threat", "detection", "audit", "security", "etd"], reference: ["siem", "soar", "etd"], boost: 20 },
-  { name: "federated-ml", query: ["federated", "ml", "machine", "learning", "training", "model", "models", "aicore", "ai"], reference: ["federated", "ml", "machine", "learning", "aicore", "ai"], boost: 22 },
+  { name: "federated-ml", query: ["federated", "ml", "machine", "learning", "training", "model", "models", "aicore", "ai"], requiresAny: ["ml", "machine", "learning", "training", "model", "models", "aicore", "ai"], reference: ["federated", "ml", "machine", "learning", "aicore", "ai"], boost: 22 },
   { name: "edge-integration-cell", query: ["edge", "eic", "cell", "pipo", "pi", "po", "runtime", "migration"], reference: ["edge", "eic", "cell", "pipo", "integration"], boost: 20 },
   { name: "successfactors", query: ["successfactors", "hxm", "bizx", "employee", "recruiting", "module", "modules", "talent"], reference: ["successfactors", "hxm", "bizx", "recruiting"], boost: 22 }
 ].map((scenario) => ({
   ...scenario,
   query: new Set(scenario.query),
+  requiresAny: new Set(scenario.requiresAny || []),
   reference: new Set(scenario.reference)
 }));
+
+const EXCLUSION_CLAUSE_SOURCE = String.raw`\b(?:exclude(?:s|d|ing)?|without|omit(?:s|ted|ting)?|do\s+not\s+include|don't\s+include|must\s+not\s+include|no)\b[^.;\n]*`;
+const EXCLUSION_DIRECTIVES = new Set([
+  "do", "don", "exclude", "excluded", "excludes", "excluding", "include",
+  "must", "no", "not", "omit", "omits", "omitted", "omitting", "without"
+]);
 
 const metadataCache = new Map();
 
@@ -81,6 +88,18 @@ export function tokens(text = "") {
   if (out.has("pi") && out.has("po")) out.add("pipo");
   if (out.has("edge") && out.has("integration") && out.has("cell")) out.add("eic");
   return out;
+}
+
+export function querySignals(query) {
+  const clauses = [...query.matchAll(new RegExp(EXCLUSION_CLAUSE_SOURCE, "gi"))].map((match) => match[0]);
+  const positiveQuery = query.replace(new RegExp(EXCLUSION_CLAUSE_SOURCE, "gi"), " ");
+  const excluded = new Set();
+  for (const clause of clauses) {
+    for (const token of tokens(clause)) {
+      if (!EXCLUSION_DIRECTIVES.has(token)) excluded.add(token);
+    }
+  }
+  return { positiveQuery, excluded };
 }
 
 export function setIntersection(a, b) {
@@ -179,7 +198,8 @@ function hasAny(set, values) {
 }
 
 export function scoreReference(path, query) {
-  const qTokens = tokens(query);
+  const { positiveQuery, excluded: excludedTokens } = querySignals(query);
+  const qTokens = tokens(positiveQuery);
   const metadata = templateMetadata(path);
   const docText = drawioText(path);
   const metaText = metadataSearchText(path, metadata);
@@ -216,7 +236,7 @@ export function scoreReference(path, query) {
     reasons.push(`metadata match: ${metaHits.slice(0, 8).join(", ")} (+${Math.trunc(boost)})`);
   }
 
-  const aliasHits = phraseHits(query, Array.isArray(metadata.aliases) ? metadata.aliases : []);
+  const aliasHits = phraseHits(positiveQuery, Array.isArray(metadata.aliases) ? metadata.aliases : []);
   if (aliasHits.length) {
     const boost = Math.min(30.0, 12.0 + (aliasHits.length - 1) * 6.0);
     value += boost;
@@ -224,7 +244,7 @@ export function scoreReference(path, query) {
   }
 
   const title = metadata.title;
-  if (typeof title === "string" && phraseHits(query, [title]).length) {
+  if (typeof title === "string" && phraseHits(positiveQuery, [title]).length) {
     value += 22;
     reasons.push("metadata title phrase match (+22)");
   }
@@ -261,6 +281,7 @@ export function scoreReference(path, query) {
 
   for (const scenario of SCENARIOS) {
     const qHit = setIntersection(qTokens, scenario.query);
+    if (scenario.requiresAny.size && !setIntersection(qTokens, scenario.requiresAny).length) continue;
     let rHit = setIntersection(filenameTokens, scenario.reference);
     if (!rHit.length) rHit = setIntersection(mTokens, scenario.reference);
     if (qHit.length && rHit.length) {
@@ -269,7 +290,7 @@ export function scoreReference(path, query) {
     }
   }
 
-  const strongQueryTags = setIntersection(qTokens, new Set(["devops", "federated", "ml", "eic", "pipo", "siem", "soar", "successfactors", "embodied", "agentic"]));
+  const strongQueryTags = setIntersection(qTokens, new Set(["devops", "ml", "eic", "pipo", "siem", "soar", "successfactors", "embodied", "agentic"]));
   if (strongQueryTags.length && !strongQueryTags.some((tag) => filenameTokens.has(tag) || mTokens.has(tag))) {
     value -= 10;
     reasons.push("strong scenario mismatch penalty (-10)");
@@ -286,12 +307,32 @@ export function scoreReference(path, query) {
     }
   }
 
-  if (metadata.primary) {
+  const primaryFamilySignals = new Set([
+    "agent", "agents", "agentic", "mcp", "a2a", "tool", "tools", "joule",
+    "copilot", "cline", "llm", "genai", "generative", "ai"
+  ]);
+  if (metadata.primary && setIntersection(qTokens, primaryFamilySignals).length) {
     const subSignals = new Set(["embodied", "robotics", "procode", "developer", "code", "vscode", "ide", "studio", "ecosystem"]);
     if (!setIntersection(qTokens, subSignals).length) {
       value += 14;
       reasons.push("metadata primary-template boost (+14)");
     }
+  }
+
+  const excludedMetaHits = setIntersection(excludedTokens, new Set([...filenameTokens, ...mTokens])).sort();
+  const excludedVisibleHits = setIntersection(
+    excludedTokens,
+    new Set([...dTokens].filter((token) => !filenameTokens.has(token) && !mTokens.has(token)))
+  ).sort();
+  if (excludedMetaHits.length) {
+    const penalty = Math.min(32.0, excludedMetaHits.length * 8.0);
+    value -= penalty;
+    reasons.push(`excluded metadata/filename terms: ${excludedMetaHits.slice(0, 8).join(", ")} (-${Math.trunc(penalty)})`);
+  }
+  if (excludedVisibleHits.length) {
+    const penalty = Math.min(12.0, excludedVisibleHits.length * 2.0);
+    value -= penalty;
+    reasons.push(`excluded visible terms: ${excludedVisibleHits.slice(0, 8).join(", ")} (-${Math.trunc(penalty)})`);
   }
   if (hasAny(qTokens, ["xsuaa", "oauth", "oidc", "saml"]) && (hasAny(filenameTokens, ["authentication", "authn"]) || (filenameLower.includes("cloud") && filenameLower.includes("identity")))) {
     value += 8;

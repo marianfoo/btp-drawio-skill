@@ -21,7 +21,7 @@ The files under this directory are **not** covered by the MIT license that appli
 
 ## Bundled reference templates
 
-All 63 templates under `reference-examples/` are sourced verbatim from SAP and are licensed under Apache-2.0.
+All 71 templates under `reference-examples/` are sourced verbatim from SAP and are licensed under Apache-2.0.
 
 ### From `SAP/btp-solution-diagrams` (prefix `btp_`)
 
@@ -114,6 +114,12 @@ These files come from <https://github.com/SAP/sap-btp-reference-architectures>, 
 | `ext_GenAI_RAG_v2.drawio` | hyperscalers/openai/architectures/Retrieval-Augmented-Generation-and-Generative-AI-on-SAP-BTP.drawio |
 | `ext_HyperscalerDatasphere.drawio` | hyperscalers/google-datasphere/architectures/Explore-your-Hyperscaler-data-with-SAP-Datasphere.drawio |
 | `ext_CloudLeadingAuthn.drawio` | security/cloud-leading-authn/architectures/Cloud-leading-Authentication.drawio |
+
+## Snapshot provenance
+
+`source-manifest.json` records the SHA-256 digest and source group for every bundled `.drawio` template and library file. The source package did not record the exact SAP upstream commit for each copied file, so the manifest states that limitation explicitly instead of attributing the snapshot to a current repository HEAD.
+
+Regenerate the manifest with `scripts/build_source_manifest.py` whenever bundled templates or libraries change. A modified output diagram must retain this NOTICE in its distributing package, but must not retain source-specific official QR codes or reference identifiers in a way that implies SAP endorsement of the modified architecture.
 
 ## Apache License 2.0 — short summary
 
